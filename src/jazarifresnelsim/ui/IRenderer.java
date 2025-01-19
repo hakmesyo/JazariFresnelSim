@@ -1,4 +1,4 @@
-package com.cezeri.fresnelsim.interfaces;
+package jazarifresnelsim.ui;
 
 // IRenderer.java
 

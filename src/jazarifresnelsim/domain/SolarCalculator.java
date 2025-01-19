@@ -1,7 +1,7 @@
 // SolarCalculator.java copied from Open Jazari Library/utils https://github.com/hakmesyo/OJL
-package jazarifresnelsim.core;
+package jazarifresnelsim.domain;
 
-import jazarifresnelsim.model.SolarPosition;
+import jazarifresnelsim.models.SolarPosition;
 import java.time.LocalDateTime;
 
 /**

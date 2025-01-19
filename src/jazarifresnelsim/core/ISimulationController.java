@@ -1,4 +1,4 @@
-package com.cezeri.fresnelsim.interfaces;
+package jazarifresnelsim.core;
 
 import controlP5.ControlP5;
 import java.time.LocalDateTime;

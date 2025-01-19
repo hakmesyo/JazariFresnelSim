@@ -1,11 +1,12 @@
 // SimulationState.java
-package jazarifresnelsim.model;
+package jazarifresnelsim.models;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
-import static jazarifresnelsim.model.Constants.*;
+import static jazarifresnelsim.domain.Constants.*;
 
 /**
  * Maintains the current state of the simulation. This class is mutable but
@@ -44,6 +45,25 @@ public class SimulationState {
         this.isAnimating = false;
         this.mirrorPositions = new ArrayList<>();
         this.simulationStepMinutes = 1.0;
+    }
+
+    public synchronized LocalDateTime getEndTime() {
+        return endTime;
+    }
+
+    // Var olan setTimeRange metodunu güncelleyelim
+    public synchronized void setTimeRange(LocalDateTime start, LocalDateTime end) {
+        System.out.println("Setting time range in state:");
+        System.out.println("Start: " + start.format(DateTimeFormatter.ofPattern("HH:mm")));
+        System.out.println("End: " + end.format(DateTimeFormatter.ofPattern("HH:mm")));
+        this.startTime = start;
+        this.endTime = end;
+    }
+
+    // Yeni direkt setter metodu ekleyelim
+    public synchronized void setEndTime(LocalDateTime end) {
+        System.out.println("Setting end time to: " + end.format(DateTimeFormatter.ofPattern("HH:mm")));
+        this.endTime = end;
     }
 
     // Synchronized getters and setters
@@ -91,14 +111,6 @@ public class SimulationState {
         return startTime;
     }
 
-    public synchronized LocalDateTime getEndTime() {
-        return endTime;
-    }
-
-    public synchronized void setTimeRange(LocalDateTime start, LocalDateTime end) {
-        this.startTime = start;
-        this.endTime = end;
-    }
 
     public synchronized double getSimulationStepMinutes() {
         return simulationStepMinutes;
@@ -161,9 +173,6 @@ public class SimulationState {
         this.startTime = startTime;
     }
 
-    public void setEndTime(LocalDateTime endTime) {
-        this.endTime = endTime;
-    }
 
     public void setIsAnimating(boolean isAnimating) {
         this.isAnimating = isAnimating;
@@ -192,6 +201,5 @@ public class SimulationState {
     public void setSupportHeight(float supportHeight) {
         this.supportHeight = supportHeight;
     }
-    
-    
+
 }

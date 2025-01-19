@@ -1,17 +1,19 @@
 package jazarifresnelsim;
 
-import com.cezeri.fresnelsim.interfaces.IRenderer;
-import com.cezeri.fresnelsim.interfaces.ISimulationController;
+import jazarifresnelsim.ui.FresnelRenderer;
+import jazarifresnelsim.models.SimulationState;
+import jazarifresnelsim.models.SolarPosition;
+import jazarifresnelsim.ui.IRenderer;
+import jazarifresnelsim.core.ISimulationController;
 import processing.core.PApplet;
 import processing.core.PFont;
 import controlP5.*;
 import peasy.PeasyCam;
 import jazarifresnelsim.core.*;
-import jazarifresnelsim.model.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import static jazarifresnelsim.model.Constants.*;
-import jazarifresnelsim.interfaces.IGUIUpdateCallback;
+import static jazarifresnelsim.domain.Constants.*;
+import jazarifresnelsim.ui.IGUIUpdateCallback;
 
 public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
@@ -73,11 +75,11 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
     @Override
     public void onTimeUpdate(String currentTime) {
-        // GUI thread'inde güvenli güncelleme için
         if (cp5 != null) {
-            Textfield currentTimeField = cp5.get(Textfield.class, "CurrentTime");
+            Textfield currentTimeField = cp5.get(Textfield.class, "CURRENT TIME");
             if (currentTimeField != null) {
                 currentTimeField.setText(currentTime);
+                System.out.println("Current time updated to: " + currentTime);
             }
         }
     }
@@ -246,22 +248,67 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
     public void controlEvent(ControlEvent event) {
         if (event.isController()) {
             String name = event.getController().getName();
-            System.out.println("Control Event triggered for: " + name);  // Debug print
+            String value = "";
+            if (event.getController() instanceof Textfield) {
+                value = ((Textfield) event.getController()).getText();
+            }
+            System.out.println("Control Event: " + name + " = " + value);
 
             switch (name) {
-                case "Start" ->
+                case "Start" -> {
+                    System.out.println("\nChecking all time values before start:");
+                    System.out.println("START TIME: " + cp5.get(Textfield.class, "START TIME").getText());
+                    System.out.println("END TIME: " + cp5.get(Textfield.class, "END TIME").getText());
+                    System.out.println("DATE: " + cp5.get(Textfield.class, "DATE").getText());
                     handleStart();
+                }
                 case "Stop" ->
                     simulationController.stopSimulation();
+
                 case "LATITUDE", "LONGITUDE" ->
                     handleLocationUpdate();
-                case "NUMBER OF MIRRORS" -> {
-                    System.out.println("Number of mirrors change detected!");  // Debug print
+
+                case "NUMBER OF MIRRORS", "RECEIVER HEIGHT", "RECEIVER DIAMETER", "MIRROR WIDTH", "MIRROR LENGTH", "MIRROR SPACING", "SUPPORT HEIGHT" ->
                     handleSystemParameterUpdate();
+
+                case "START TIME", "END TIME" -> {
+                    System.out.println("\nTime input changed:");
+                    System.out.println("Field: " + name + " = " + value);
+                    // İsterseniz burada zaman değişikliklerini hemen işleyebiliriz
+                    handleTimeUpdate();
                 }
-                case "RECEIVER HEIGHT", "RECEIVER DIAMETER", "MIRROR WIDTH", "MIRROR LENGTH", "MIRROR SPACING", "SUPPORT HEIGHT" ->
-                    handleSystemParameterUpdate();
             }
+        }
+    }
+
+    private void handleTimeUpdate() {
+        try {
+            String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
+            String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
+            String dateStr = cp5.get(Textfield.class, "DATE").getText();
+
+            System.out.println("Processing time update:");
+            System.out.println("Start Time: " + startTimeStr);
+            System.out.println("End Time: " + endTimeStr);
+            System.out.println("Date: " + dateStr);
+
+            LocalDateTime startDateTime = LocalDateTime.parse(
+                    dateStr + " " + startTimeStr,
+                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            );
+            LocalDateTime endDateTime = LocalDateTime.parse(
+                    dateStr + " " + endTimeStr,
+                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            );
+
+            // State'i güncelle
+            state.setStartTime(startDateTime);
+            state.setEndTime(endDateTime);
+
+            System.out.println("Time values updated in state");
+
+        } catch (Exception e) {
+            System.out.println("Error updating time values: " + e.getMessage());
         }
     }
 
@@ -313,41 +360,51 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
     private void handleStart() {
         try {
-            // Önce sistem parametrelerini güncelle
-            System.out.println("Handling system parameters before start...");
-            handleSystemParameterUpdate();
-
+            // 1. Önce tüm değerleri oku ve kontrol et
             String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
             String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
             String dateStr = cp5.get(Textfield.class, "DATE").getText();
+
+            System.out.println("\nRead values from GUI:");
+            System.out.println("Start Time String: " + startTimeStr);
+            System.out.println("End Time String: " + endTimeStr);
+            System.out.println("Date String: " + dateStr);
+
+            // 2. Zaman dönüşümlerini yap
+            LocalDateTime startDateTime = LocalDateTime.parse(
+                    dateStr + " " + startTimeStr,
+                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            );
+            LocalDateTime endDateTime = LocalDateTime.parse(
+                    dateStr + " " + endTimeStr,
+                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            );
+
+            System.out.println("\nParsed DateTime objects:");
+            System.out.println("Start DateTime: " + startDateTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+            System.out.println("End DateTime: " + endDateTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+
+            // 3. State'i güncelle
+            state.setCurrentTime(startDateTime);
+            state.setStartTime(startDateTime);
+            state.setEndTime(endDateTime);
+
+            System.out.println("\nState after update:");
+            System.out.println("State Current Time: " + state.getCurrentTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+            System.out.println("State Start Time: " + state.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+            System.out.println("State End Time: " + state.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+
+            // 4. Controller'ı güncelle
             double step = Double.parseDouble(cp5.get(Textfield.class, "SIMULATION STEP").getText());
-
-            // Debug çıktıları
-            System.out.println("\nCurrent System Parameters:");
-            System.out.println("Number of Mirrors: " + state.getNumReflectors());
-            System.out.println("Receiver Height: " + state.getReceiverHeight());
-            System.out.println("Mirror Spacing: " + state.getReflectorSpacing());
-
-            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
-
-            LocalDateTime startDateTime = LocalDateTime.parse(dateStr + " " + startTimeStr,
-                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-            LocalDateTime endDateTime = LocalDateTime.parse(dateStr + " " + endTimeStr,
-                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-
             simulationController.setTimeRange(startDateTime, endDateTime);
             simulationController.setSimulationStep(step);
 
-            System.out.println("\nStarting simulation with updated parameters...");
+            // 5. Simülasyonu başlat
             simulationController.startSimulation();
 
-            // Renderer'ı güncelle
-            System.out.println("Reinitializing renderer...");
-            renderer = new FresnelRenderer(this, state);
-
         } catch (Exception e) {
-            System.out.println("Error starting simulation: " + e.getMessage());
+            System.out.println("Error in handleStart:");
+            System.out.println("Error message: " + e.getMessage());
             e.printStackTrace();
         }
     }

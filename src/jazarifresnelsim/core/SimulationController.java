@@ -1,15 +1,17 @@
 package jazarifresnelsim.core;
 
-import com.cezeri.fresnelsim.interfaces.ISimulationController;
+import jazarifresnelsim.domain.SolarCalculator;
+import jazarifresnelsim.models.SimulationState;
+import jazarifresnelsim.models.MirrorPosition;
+import jazarifresnelsim.models.SolarPosition;
 import controlP5.ControlP5;
 import controlP5.Textfield;
-import jazarifresnelsim.model.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import static jazarifresnelsim.model.Constants.*;
-import jazarifresnelsim.interfaces.IGUIUpdateCallback;
+import static jazarifresnelsim.domain.Constants.*;
+import jazarifresnelsim.ui.IGUIUpdateCallback;
 
 public class SimulationController implements ISimulationController {
 
@@ -49,19 +51,31 @@ public class SimulationController implements ISimulationController {
 
         frameCounter++;
         if (frameCounter >= FRAMES_PER_UPDATE) {
+            // Mevcut zamanı simülasyon adımına göre güncelle
             LocalDateTime currentTime = state.getCurrentTime();
             double stepMinutes = state.getSimulationStepMinutes();
             currentTime = currentTime.plusMinutes((long) stepMinutes);
 
-            if (currentTime.isAfter(state.getEndTime())) {
+            // End time kontrolünü debug edelim
+            LocalDateTime endTime = state.getEndTime();
+            System.out.println("Current Time: " + currentTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+            System.out.println("End Time: " + endTime.format(DateTimeFormatter.ofPattern("HH:mm")));
+
+            if (currentTime.isAfter(endTime)) {
+                System.out.println("Simulation ended: Current time passed end time");
                 stopSimulation();
                 return;
             }
 
             state.setCurrentTime(currentTime);
+
+            if (guiCallback != null) {
+                String timeStr = currentTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+                guiCallback.onTimeUpdate(timeStr);
+            }
+
             updateSolarPosition();
             updateMirrorPositions();
-            updateCurrentTimeDisplay();  // GUI callback'i çağır
 
             frameCounter = 0;
         }
@@ -204,19 +218,8 @@ public class SimulationController implements ISimulationController {
     }
 
     private void updateCurrentTime() {
-        LocalDateTime currentTime = LocalDateTime.now()
-                .withMonth(selectedMonth)
-                .withDayOfMonth(selectedDay)
-                .withHour(8)
-                .withMinute(0)
-                .withSecond(0)
-                .withNano(0);
-
-        state.setCurrentTime(currentTime);
-        state.setTimeRange(
-                currentTime,
-                currentTime.withHour(17).withMinute(0)
-        );
+        // Sadece current time'ı start time'a eşitleyelim
+        state.setCurrentTime(state.getStartTime());
     }
 
     public void updateDaysInMonth(int month) {

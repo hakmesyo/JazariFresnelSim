@@ -1,5 +1,5 @@
 // MirrorPosition.java
-package jazarifresnelsim.model;
+package jazarifresnelsim.models;
 
 /**
  * Represents the position and orientation of a single mirror in the Fresnel system.

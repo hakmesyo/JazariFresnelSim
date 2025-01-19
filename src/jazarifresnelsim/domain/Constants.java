@@ -1,5 +1,5 @@
 // Constants.java
-package jazarifresnelsim.model;
+package jazarifresnelsim.domain;
 
 public final class Constants {
     // Reflector parameters (all dimensions in centimeters)

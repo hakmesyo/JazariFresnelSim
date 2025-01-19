@@ -1,12 +1,11 @@
-package jazarifresnelsim.core;
+package jazarifresnelsim.ui;
 
-import com.cezeri.fresnelsim.interfaces.IRenderer;
-import controlP5.Textfield;
-import java.time.format.DateTimeFormatter;
+import jazarifresnelsim.models.SimulationState;
+import jazarifresnelsim.models.MirrorPosition;
+import jazarifresnelsim.models.SolarPosition;
 import java.util.List;
 import processing.core.*;
-import jazarifresnelsim.model.*;
-import static jazarifresnelsim.model.Constants.*;
+import static jazarifresnelsim.domain.Constants.*;
 
 public class FresnelRenderer implements IRenderer {
 

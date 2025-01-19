@@ -1,5 +1,5 @@
 // GUIUpdateCallback.java
-package jazarifresnelsim.interfaces;
+package jazarifresnelsim.ui;
 
 public interface IGUIUpdateCallback {
     void onTimeUpdate(String currentTime);

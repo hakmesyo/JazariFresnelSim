@@ -1,5 +1,5 @@
 // SolarPosition.java copied from Open Jazari Library/utils https://github.com/hakmesyo/OJL
-package jazarifresnelsim.model;
+package jazarifresnelsim.models;
 
 /**
  * Represents the position of the sun in the sky using altitude and azimuth angles.
