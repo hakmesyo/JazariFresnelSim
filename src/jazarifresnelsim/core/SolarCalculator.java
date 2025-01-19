@@ -1,47 +1,32 @@
-package jazarifresnelsim.model;
+// SolarCalculator.java copied from Open Jazari Library/utils https://github.com/hakmesyo/OJL
+package jazarifresnelsim.core;
 
+import jazarifresnelsim.model.SolarPosition;
 import java.time.LocalDateTime;
 
 /**
- * Calculates the position of the sun based on time, date, and location.
- * Implements various astronomical algorithms for precise solar tracking.
- * 
- * 
- * @version 1.0
+ * Calculates solar position based on time and location.
+ * This class handles all astronomical calculations for solar tracking.
  */
-public class SolarTracker {
-    /** Latitude in radians */
-    private final double latitude;
+public class SolarCalculator {
+    private double latitude;  // in radians
+    private double longitude; // in radians
+    private double altitude; // in meters
     
-    /** Longitude in radians */
-    private final double longitude;
+    private static final double SOLAR_CONSTANT = 1361.0; // W/m²
     
-    /** Altitude above sea level in meters */
-    private final double altitude;
-    
-    /** Solar constant in W/m² */
-    private static final double SOLAR_CONSTANT = 1361.0;
-    
-    /**
-     * Constructs a new SolarTracker for the specified location
-     * 
-     * @param latitudeDegrees Latitude in degrees (positive for North)
-     * @param longitudeDegrees Longitude in degrees (positive for East)
-     * @param altitude Altitude above sea level in meters
-     */
-    public SolarTracker(double latitudeDegrees, double longitudeDegrees, double altitude) {
-        this.latitude = Math.toRadians(latitudeDegrees);
-        this.longitude = Math.toRadians(longitudeDegrees);
+    public SolarCalculator(double latitudeDegrees, double longitudeDegrees, double altitude) {
+        updateLocation(latitudeDegrees, longitudeDegrees);
         this.altitude = altitude;
     }
     
-    /**
-     * Calculates the sun's position for a given date and time
-     * 
-     * @param dateTime The date and time for calculation
-     * @return SolarPosition object containing altitude and azimuth angles
-     */
+    public void updateLocation(double latitudeDegrees, double longitudeDegrees) {
+        this.latitude = Math.toRadians(latitudeDegrees);
+        this.longitude = Math.toRadians(longitudeDegrees);
+    }
+    
     public SolarPosition calculateSolarPosition(LocalDateTime dateTime) {
+        //System.out.println("Calculating solar position for: " + dateTime);
         int dayOfYear = dateTime.getDayOfYear();
         
         // Calculate solar declination angle (Spencer formula)
@@ -83,23 +68,23 @@ public class SolarTracker {
             azimuthAngle = 360 - azimuthAngle;
         }
         
-        // Calculate solar intensity with atmospheric correction
+        // Apply atmospheric corrections
         double airMass = calculateAirMass(altitudeAngle);
         double atmosphericRefraction = calculateAtmosphericRefraction(altitudeAngle);
         altitudeAngle += atmosphericRefraction / 3600.0; // Convert arcseconds to degrees
         
-        // Estimate solar intensity using air mass
+        // Calculate solar intensity with atmospheric effects
         double solarIntensity = SOLAR_CONSTANT * Math.pow(0.7, Math.pow(airMass, 0.678));
         
         return new SolarPosition(altitudeAngle, azimuthAngle, solarIntensity);
     }
     
-    /**
-     * Calculates atmospheric refraction correction
-     * 
-     * @param altitude Apparent altitude angle in degrees
-     * @return Refraction correction in arcseconds
-     */
+    private double calculateAirMass(double altitude) {
+        double zenith = 90 - altitude;
+        double cosZenith = Math.cos(Math.toRadians(zenith));
+        return 1 / (cosZenith + 0.50572 * Math.pow(96.07995 - zenith, -1.6364));
+    }
+    
     private double calculateAtmosphericRefraction(double altitude) {
         if (altitude > 85.0) return 0;
         
@@ -111,17 +96,5 @@ public class SolarTracker {
             return 1735.0 + altitude * (-518.2 + altitude * (103.4 + altitude * (-12.79 + altitude * 0.711)));
         }
         return -20.774 / te;
-    }
-    
-    /**
-     * Calculates relative air mass
-     * 
-     * @param altitude Solar altitude angle in degrees
-     * @return Relative air mass
-     */
-    private double calculateAirMass(double altitude) {
-        double zenith = 90 - altitude;
-        double cosZenith = Math.cos(Math.toRadians(zenith));
-        return 1 / (cosZenith + 0.50572 * Math.pow(96.07995 - zenith, -1.6364));
     }
 }
