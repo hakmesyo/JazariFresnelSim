@@ -12,7 +12,10 @@ import peasy.PeasyCam;
 import jazarifresnelsim.core.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import static jazarifresnelsim.domain.Constants.*;
+import jazarifresnelsim.domain.SolarCalculator;
+import jazarifresnelsim.models.MirrorPosition;
 import jazarifresnelsim.ui.IGUIUpdateCallback;
 
 public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
@@ -22,6 +25,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
     private IRenderer renderer;
     private PeasyCam cam;
     private ControlP5 cp5;
+    private SolarCalculator solarCalculator;
 
     public static void main(String[] args) {
         PApplet.main(new String[]{FresnelSimulator.class.getName()});
@@ -39,6 +43,8 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
         // Önce state'i oluştur
         state = new SimulationState();
+
+        solarCalculator = new SolarCalculator(state.getLatitude(), state.getLongitude(), 0);
 
         // Sonra controller'ı oluştur
         simulationController = new SimulationController(state);
@@ -100,7 +106,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
         // Main control group
         Group guiGroup = cp5.addGroup("SETTINGS")
-                .setPosition(20, 50)
+                .setPosition(width-20-GUI_PANEL_WIDTH, 50)
                 .setWidth(GUI_PANEL_WIDTH)
                 .setBackgroundColor(backgroundColor)
                 .setBackgroundHeight(GUI_PANEL_HEIGHT)
@@ -174,7 +180,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         currentY += TEXT_HEIGHT + GUI_SPACING;
 
         // Simulation step input
-        addTextField("SIMULATION STEP", "1",
+        addTextField("SIMULATION STEP", "10",
                 GUI_SPACING, currentY, GUI_PANEL_WIDTH - 2 * GUI_SPACING, TEXT_HEIGHT,
                 guiGroup, backgroundColor, labelColor, textColor, activeColor, foregroundColor);
         currentY += TEXT_HEIGHT + GUI_SPACING;
@@ -322,11 +328,10 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
     private void handleSystemParameterUpdate() {
         try {
-            System.out.println("\nReading current field values:");
+            System.out.println("\nReading all parameters from GUI...");
 
+            // Sistem parametrelerini oku
             int numMirrors = Integer.parseInt(cp5.get(Textfield.class, "NUMBER OF MIRRORS").getText());
-            System.out.println("Read number of mirrors: " + numMirrors);
-
             float recHeight = Float.parseFloat(cp5.get(Textfield.class, "RECEIVER HEIGHT").getText());
             float recDiameter = Float.parseFloat(cp5.get(Textfield.class, "RECEIVER DIAMETER").getText());
             float mirrorWidth = Float.parseFloat(cp5.get(Textfield.class, "MIRROR WIDTH").getText());
@@ -334,8 +339,19 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
             float mirrorSpacing = Float.parseFloat(cp5.get(Textfield.class, "MIRROR SPACING").getText());
             float supportHeight = Float.parseFloat(cp5.get(Textfield.class, "SUPPORT HEIGHT").getText());
 
+            // Konum parametrelerini oku
+            double latitude = Double.parseDouble(cp5.get(Textfield.class, "LATITUDE").getText());
+            double longitude = Double.parseDouble(cp5.get(Textfield.class, "LONGITUDE").getText());
+
+            // Zaman parametrelerini oku
+            String dateStr = cp5.get(Textfield.class, "DATE").getText();
+            String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
+            String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
+            double simStep = Double.parseDouble(cp5.get(Textfield.class, "SIMULATION STEP").getText());
+
             System.out.println("\nUpdating state with new values...");
 
+            // Sistem parametrelerini güncelle
             state.setNumReflectors(numMirrors);
             state.setReceiverHeight(recHeight);
             state.setReceiverDiameter(recDiameter);
@@ -344,62 +360,54 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
             state.setReflectorSpacing(mirrorSpacing);
             state.setSupportHeight(supportHeight);
 
-            System.out.println("State updated. Verifying values:");
-            System.out.println("Number of mirrors in state: " + state.getNumReflectors());
+            // Konum parametrelerini güncelle
+            state.setLatitude(latitude);
+            state.setLongitude(longitude);
 
-            // Controller ve renderer güncellemeleri
-            System.out.println("\nUpdating controller and renderer...");
-            simulationController.updateMirrorPositions();
-            simulationController.updateSolarPosition();
+            // Zaman parametrelerini güncelle
+            try {
+                LocalDateTime startDateTime = LocalDateTime.parse(
+                        dateStr + " " + startTimeStr,
+                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                );
+                LocalDateTime endDateTime = LocalDateTime.parse(
+                        dateStr + " " + endTimeStr,
+                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                );
+
+                state.setStartTime(startDateTime);
+                state.setEndTime(endDateTime);
+                state.setCurrentTime(startDateTime);
+                state.setSimulationStepMinutes(simStep);
+
+            } catch (Exception e) {
+                System.out.println("Error parsing date/time values: " + e.getMessage());
+            }
+
+            System.out.println("State updated. Reinitializing system...");
+
+            // Güneş hesaplayıcıyı güncelle
+            simulationController.setLocation(latitude, longitude);
+
+            // Sistem parametrelerini güncelle
+            reinitializeSystem();
+
+            System.out.println("System reinitialization complete.");
 
         } catch (NumberFormatException e) {
-            System.out.println("Error parsing values: " + e.getMessage());
+            System.out.println("Error parsing numeric values: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private void handleStart() {
         try {
-            // 1. Önce tüm değerleri oku ve kontrol et
-            String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
-            String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
-            String dateStr = cp5.get(Textfield.class, "DATE").getText();
+            System.out.println("\nStart button pressed - updating all parameters...");
 
-            System.out.println("\nRead values from GUI:");
-            System.out.println("Start Time String: " + startTimeStr);
-            System.out.println("End Time String: " + endTimeStr);
-            System.out.println("Date String: " + dateStr);
+            // Tüm parametreleri güncelle
+            handleSystemParameterUpdate();
 
-            // 2. Zaman dönüşümlerini yap
-            LocalDateTime startDateTime = LocalDateTime.parse(
-                    dateStr + " " + startTimeStr,
-                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-            );
-            LocalDateTime endDateTime = LocalDateTime.parse(
-                    dateStr + " " + endTimeStr,
-                    DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-            );
-
-            System.out.println("\nParsed DateTime objects:");
-            System.out.println("Start DateTime: " + startDateTime.format(DateTimeFormatter.ofPattern("HH:mm")));
-            System.out.println("End DateTime: " + endDateTime.format(DateTimeFormatter.ofPattern("HH:mm")));
-
-            // 3. State'i güncelle
-            state.setCurrentTime(startDateTime);
-            state.setStartTime(startDateTime);
-            state.setEndTime(endDateTime);
-
-            System.out.println("\nState after update:");
-            System.out.println("State Current Time: " + state.getCurrentTime().format(DateTimeFormatter.ofPattern("HH:mm")));
-            System.out.println("State Start Time: " + state.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")));
-            System.out.println("State End Time: " + state.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")));
-
-            // 4. Controller'ı güncelle
-            double step = Double.parseDouble(cp5.get(Textfield.class, "SIMULATION STEP").getText());
-            simulationController.setTimeRange(startDateTime, endDateTime);
-            simulationController.setSimulationStep(step);
-
-            // 5. Simülasyonu başlat
+            // Simülasyonu başlat
             simulationController.startSimulation();
 
         } catch (Exception e) {
@@ -409,16 +417,15 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         }
     }
 
-    private void handleLocationUpdate() {
-        try {
-            double lat = Double.parseDouble(cp5.get(Textfield.class, "Latitude").getText());
-            double lon = Double.parseDouble(cp5.get(Textfield.class, "Longitude").getText());
-            simulationController.setLocation(lat, lon);
-        } catch (NumberFormatException e) {
-            println("Invalid location values");
-        }
-    }
-
+//    private void handleLocationUpdate() {
+//        try {
+//            double lat = Double.parseDouble(cp5.get(Textfield.class, "Latitude").getText());
+//            double lon = Double.parseDouble(cp5.get(Textfield.class, "Longitude").getText());
+//            simulationController.setLocation(lat, lon);
+//        } catch (NumberFormatException e) {
+//            println("Invalid location values");
+//        }
+//    }
     @Override
     public void draw() {
         background(135, 206, 235); // Sky blue background
@@ -440,19 +447,53 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         textSize(14);
 
         int infoX = 20;
-        int infoY = height - 100;
+        int infoY = height - 140;  // Adjusted for more info
 
         String dateStr = state.getCurrentTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
         String timeStr = state.getCurrentTime().format(DateTimeFormatter.ofPattern("HH:mm"));
 
         SolarPosition sunPos = state.getCurrentSolarPosition();
         if (sunPos != null) {
+            // Basic info
             text("Date: " + dateStr, infoX, infoY);
             text("Time: " + timeStr, infoX, infoY + 20);
             text(String.format("Sun Altitude: %.1f°", sunPos.getAltitudeAngle()),
                     infoX, infoY + 40);
             text(String.format("Sun Azimuth: %.1f°", sunPos.getAzimuthAngle()),
                     infoX, infoY + 60);
+
+            // Energy calculations
+            double totalEnergy = solarCalculator.calculateTotalEnergy(state);
+            text(String.format("Total Energy: %.1f W (%.2f kW)",
+                    totalEnergy, totalEnergy / 1000), infoX, infoY + 80);
+
+            // Efficiency information
+            List<MirrorPosition> mirrors = state.getMirrorPositions();
+            double avgSpillage = mirrors.stream()
+                    .mapToDouble(m -> solarCalculator.calculateSpillageLoss(m, state))
+                    .average()
+                    .orElse(0.0);
+            double avgBlocking = mirrors.stream()
+                    .mapToDouble(m -> solarCalculator.calculateBlockingAndShadingLoss(m, mirrors, state, sunPos))
+                    .average()
+                    .orElse(0.0);
+
+            text(String.format("Spillage Efficiency: %.1f%%", avgSpillage * 100),
+                    infoX, infoY + 100);
+            text(String.format("Blocking Efficiency: %.1f%%", avgBlocking * 100),
+                    infoX, infoY + 120);
+        }
+    }
+
+    // Konum güncellendiğinde SolarCalculator'ı da güncelle
+    private void handleLocationUpdate() {
+        try {
+            double lat = Double.parseDouble(cp5.get(Textfield.class, "LATITUDE").getText());
+            double lon = Double.parseDouble(cp5.get(Textfield.class, "LONGITUDE").getText());
+            simulationController.setLocation(lat, lon);
+            solarCalculator.updateLocation(lat, lon);  // Yeni eklenen
+        } catch (NumberFormatException e) {
+            println("Invalid location values");
         }
     }
 

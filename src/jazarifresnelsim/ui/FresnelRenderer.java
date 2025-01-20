@@ -41,7 +41,7 @@ public class FresnelRenderer implements IRenderer {
         }
         tube.endShape();
         receiverTube.addChild(tube);
-        
+
         // Support structures
         PShape supports = sketch.createShape();
         supports.beginShape(PApplet.TRIANGLES);
@@ -287,15 +287,16 @@ public class FresnelRenderer implements IRenderer {
         sketch.sphere(30);
         sketch.popMatrix();
 
-        // Draw rays
+        // Draw rays - BURADA DÜZELTME YAPILMALI
         sketch.stroke(255, 255, 0, 100);
         sketch.strokeWeight(2);
         for (MirrorPosition pos : state.getMirrorPositions()) {
             float mirrorX = (float) pos.getXOffset();
             // Incident ray
-            sketch.line(mirrorX, 0, SUPPORT_HEIGHT + 2, sunX, sunY, sunZ);
-            // Reflected ray
-            sketch.line(mirrorX, 0, SUPPORT_HEIGHT + 2, 0, 0, RECEIVER_HEIGHT);
+            sketch.line(mirrorX, 0, state.getSupportHeight() + 2, sunX, sunY, sunZ);
+            // Reflected ray - BURADA state.getReceiverHeight() KULLANMALIYIZ
+            sketch.line(mirrorX, 0, state.getSupportHeight() + 2,
+                    0, 0, state.getReceiverHeight()); // RECEIVER_HEIGHT yerine state.getReceiverHeight()
         }
     }
 
