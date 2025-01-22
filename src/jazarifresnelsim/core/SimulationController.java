@@ -128,61 +128,60 @@ public class SimulationController implements ISimulationController {
         updateMirrorPositions();
     }
 
-    private double calculateOptimalMirrorAngle(double mirrorX, SolarPosition sunPos, SimulationState state) {
-        // Güneş pozisyonunu radyana çevir
-        double sunAltitude = Math.toRadians(sunPos.getAltitudeAngle());
-        double sunAzimuth = Math.toRadians(sunPos.getAzimuthAngle());
-
-        // Güneş ışını vektörü
-        double[] sunRay = {
-            -Math.cos(sunAltitude) * Math.sin(sunAzimuth),
-            Math.cos(sunAltitude) * Math.cos(sunAzimuth),
-            Math.sin(sunAltitude)
-        };
-
-        // Alıcı tüpe giden hedef vektörü (state'den alınan güncel değerlerle)
-        double receiverHeight = state.getReceiverHeight() / 100.0; // cm'yi metreye çevir
-        double supportHeight = state.getSupportHeight() / 100.0;
-
-        double[] targetRay = {
-            -mirrorX,
-            0,
-            receiverHeight - (supportHeight + 0.02) // 2cm'yi metre cinsinden ekle
-        };
-
-        // targetRay'i normalize et
-        double targetMagnitude = Math.sqrt(
-                targetRay[0] * targetRay[0]
-                + targetRay[1] * targetRay[1]
-                + targetRay[2] * targetRay[2]
-        );
-
-        for (int i = 0; i < 3; i++) {
-            targetRay[i] /= targetMagnitude;
-        }
-
-        // Normal vektör (gelen ve yansıyan ışınların açıortayı)
-        double[] normalVector = {
-            sunRay[0] + targetRay[0],
-            sunRay[1] + targetRay[1],
-            sunRay[2] + targetRay[2]
-        };
-
-        // Normal vektörü normalize et
-        double normalMagnitude = Math.sqrt(
-                normalVector[0] * normalVector[0]
-                + normalVector[1] * normalVector[1]
-                + normalVector[2] * normalVector[2]
-        );
-
-        for (int i = 0; i < 3; i++) {
-            normalVector[i] /= normalMagnitude;
-        }
-
-        // Y ekseni etrafındaki dönme açısını hesapla
-        return Math.toDegrees(Math.atan2(normalVector[0], normalVector[2]));
-    }
-
+//    private double calculateOptimalMirrorAngle(double mirrorX, SolarPosition sunPos, SimulationState state) {
+//        // Güneş pozisyonunu radyana çevir
+//        double sunAltitude = Math.toRadians(sunPos.getAltitudeAngle());
+//        double sunAzimuth = Math.toRadians(sunPos.getAzimuthAngle());
+//
+//        // Güneş ışını vektörü
+//        double[] sunRay = {
+//            -Math.cos(sunAltitude) * Math.sin(sunAzimuth),
+//            Math.cos(sunAltitude) * Math.cos(sunAzimuth),
+//            Math.sin(sunAltitude)
+//        };
+//
+//        // Alıcı tüpe giden hedef vektörü (state'den alınan güncel değerlerle)
+//        double receiverHeight = state.getReceiverHeight() / 100.0; // cm'yi metreye çevir
+//        double supportHeight = state.getSupportHeight() / 100.0;
+//
+//        double[] targetRay = {
+//            -mirrorX,
+//            0,
+//            receiverHeight - (supportHeight + 0.02) // 2cm'yi metre cinsinden ekle
+//        };
+//
+//        // targetRay'i normalize et
+//        double targetMagnitude = Math.sqrt(
+//                targetRay[0] * targetRay[0]
+//                + targetRay[1] * targetRay[1]
+//                + targetRay[2] * targetRay[2]
+//        );
+//
+//        for (int i = 0; i < 3; i++) {
+//            targetRay[i] /= targetMagnitude;
+//        }
+//
+//        // Normal vektör (gelen ve yansıyan ışınların açıortayı)
+//        double[] normalVector = {
+//            sunRay[0] + targetRay[0],
+//            sunRay[1] + targetRay[1],
+//            sunRay[2] + targetRay[2]
+//        };
+//
+//        // Normal vektörü normalize et
+//        double normalMagnitude = Math.sqrt(
+//                normalVector[0] * normalVector[0]
+//                + normalVector[1] * normalVector[1]
+//                + normalVector[2] * normalVector[2]
+//        );
+//
+//        for (int i = 0; i < 3; i++) {
+//            normalVector[i] /= normalMagnitude;
+//        }
+//
+//        // Y ekseni etrafındaki dönme açısını hesapla
+//        return Math.toDegrees(Math.atan2(normalVector[0], normalVector[2]));
+//    }
     @Override
     public void updateMirrorPositions() {
         List<MirrorPosition> newPositions = new ArrayList<>();
@@ -202,8 +201,9 @@ public class SimulationController implements ISimulationController {
 
             double xOffset = offset * spacing;
 
-            // State'i de parametre olarak geçir
-            double rotationAngle = calculateOptimalMirrorAngle(xOffset / 100.0, sunPos, state);
+            // Now use solarCalculator instance to calculate angle
+            double rotationAngle = solarCalculator.calculateOptimalMirrorAngle(
+                    xOffset / 100.0, sunPos, state);
 
             newPositions.add(new MirrorPosition(
                     rotationAngle,
@@ -249,6 +249,5 @@ public class SimulationController implements ISimulationController {
         SolarPosition newPosition = solarCalculator.calculateSolarPosition(state.getCurrentTime());
         state.setCurrentSolarPosition(newPosition);
     }
-
 
 }

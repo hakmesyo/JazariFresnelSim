@@ -8,15 +8,19 @@ import jazarifresnelsim.core.ISimulationController;
 import processing.core.PApplet;
 import processing.core.PFont;
 import controlP5.*;
+import java.time.LocalDate;
 import peasy.PeasyCam;
 import jazarifresnelsim.core.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import static jazarifresnelsim.domain.Constants.*;
+import jazarifresnelsim.domain.DaylightTimes;
 import jazarifresnelsim.domain.SolarCalculator;
 import jazarifresnelsim.models.MirrorPosition;
 import jazarifresnelsim.ui.IGUIUpdateCallback;
+import processing.event.MouseEvent;
 
 public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
@@ -106,7 +110,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
         // Main control group
         Group guiGroup = cp5.addGroup("SETTINGS")
-                .setPosition(width-20-GUI_PANEL_WIDTH, 50)
+                .setPosition(width - 20 - GUI_PANEL_WIDTH, 50)
                 .setWidth(GUI_PANEL_WIDTH)
                 .setBackgroundColor(backgroundColor)
                 .setBackgroundHeight(GUI_PANEL_HEIGHT)
@@ -326,6 +330,79 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         simulationController.updateSolarPosition();
     }
 
+//    private void handleSystemParameterUpdate() {
+//        try {
+//            System.out.println("\nReading all parameters from GUI...");
+//
+//            // Sistem parametrelerini oku
+//            int numMirrors = Integer.parseInt(cp5.get(Textfield.class, "NUMBER OF MIRRORS").getText());
+//            float recHeight = Float.parseFloat(cp5.get(Textfield.class, "RECEIVER HEIGHT").getText());
+//            float recDiameter = Float.parseFloat(cp5.get(Textfield.class, "RECEIVER DIAMETER").getText());
+//            float mirrorWidth = Float.parseFloat(cp5.get(Textfield.class, "MIRROR WIDTH").getText());
+//            float mirrorLength = Float.parseFloat(cp5.get(Textfield.class, "MIRROR LENGTH").getText());
+//            float mirrorSpacing = Float.parseFloat(cp5.get(Textfield.class, "MIRROR SPACING").getText());
+//            float supportHeight = Float.parseFloat(cp5.get(Textfield.class, "SUPPORT HEIGHT").getText());
+//
+//            // Konum parametrelerini oku
+//            double latitude = Double.parseDouble(cp5.get(Textfield.class, "LATITUDE").getText());
+//            double longitude = Double.parseDouble(cp5.get(Textfield.class, "LONGITUDE").getText());
+//
+//            // Zaman parametrelerini oku
+//            String dateStr = cp5.get(Textfield.class, "DATE").getText();
+//            String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
+//            String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
+//            double simStep = Double.parseDouble(cp5.get(Textfield.class, "SIMULATION STEP").getText());
+//
+//            System.out.println("\nUpdating state with new values...");
+//
+//            // Sistem parametrelerini güncelle
+//            state.setNumReflectors(numMirrors);
+//            state.setReceiverHeight(recHeight);
+//            state.setReceiverDiameter(recDiameter);
+//            state.setReflectorWidth(mirrorWidth);
+//            state.setReflectorLength(mirrorLength);
+//            state.setReflectorSpacing(mirrorSpacing);
+//            state.setSupportHeight(supportHeight);
+//
+//            // Konum parametrelerini güncelle
+//            state.setLatitude(latitude);
+//            state.setLongitude(longitude);
+//
+//            // Zaman parametrelerini güncelle
+//            try {
+//                LocalDateTime startDateTime = LocalDateTime.parse(
+//                        dateStr + " " + startTimeStr,
+//                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+//                );
+//                LocalDateTime endDateTime = LocalDateTime.parse(
+//                        dateStr + " " + endTimeStr,
+//                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+//                );
+//
+//                state.setStartTime(startDateTime);
+//                state.setEndTime(endDateTime);
+//                state.setCurrentTime(startDateTime);
+//                state.setSimulationStepMinutes(simStep);
+//
+//            } catch (Exception e) {
+//                System.out.println("Error parsing date/time values: " + e.getMessage());
+//            }
+//
+//            System.out.println("State updated. Reinitializing system...");
+//
+//            // Güneş hesaplayıcıyı güncelle
+//            simulationController.setLocation(latitude, longitude);
+//
+//            // Sistem parametrelerini güncelle
+//            reinitializeSystem();
+//
+//            System.out.println("System reinitialization complete.");
+//
+//        } catch (NumberFormatException e) {
+//            System.out.println("Error parsing numeric values: " + e.getMessage());
+//            e.printStackTrace();
+//        }
+//    }
     private void handleSystemParameterUpdate() {
         try {
             System.out.println("\nReading all parameters from GUI...");
@@ -343,13 +420,10 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
             double latitude = Double.parseDouble(cp5.get(Textfield.class, "LATITUDE").getText());
             double longitude = Double.parseDouble(cp5.get(Textfield.class, "LONGITUDE").getText());
 
-            // Zaman parametrelerini oku
+            // Tarih ve zaman parametrelerini oku
             String dateStr = cp5.get(Textfield.class, "DATE").getText();
-            String startTimeStr = cp5.get(Textfield.class, "START TIME").getText();
-            String endTimeStr = cp5.get(Textfield.class, "END TIME").getText();
+            LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("dd.MM.yyyy"));
             double simStep = Double.parseDouble(cp5.get(Textfield.class, "SIMULATION STEP").getText());
-
-            System.out.println("\nUpdating state with new values...");
 
             // Sistem parametrelerini güncelle
             state.setNumReflectors(numMirrors);
@@ -364,25 +438,22 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
             state.setLatitude(latitude);
             state.setLongitude(longitude);
 
-            // Zaman parametrelerini güncelle
-            try {
-                LocalDateTime startDateTime = LocalDateTime.parse(
-                        dateStr + " " + startTimeStr,
-                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-                );
-                LocalDateTime endDateTime = LocalDateTime.parse(
-                        dateStr + " " + endTimeStr,
-                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-                );
+            // Güneş doğuş-batış saatlerini hesapla
+            SolarCalculator calculator = new SolarCalculator(latitude, longitude, 0);
+            DaylightTimes daylight = calculator.calculateSunriseSunset(date);
 
-                state.setStartTime(startDateTime);
-                state.setEndTime(endDateTime);
-                state.setCurrentTime(startDateTime);
-                state.setSimulationStepMinutes(simStep);
+            // GUI'deki start ve end time'ı güncelle
+            String sunriseStr = daylight.getSunrise().format(DateTimeFormatter.ofPattern("HH:mm"));
+            String sunsetStr = daylight.getSunset().format(DateTimeFormatter.ofPattern("HH:mm"));
 
-            } catch (Exception e) {
-                System.out.println("Error parsing date/time values: " + e.getMessage());
-            }
+            cp5.get(Textfield.class, "START TIME").setText(sunriseStr);
+            cp5.get(Textfield.class, "END TIME").setText(sunsetStr);
+
+            // State'i yeni zaman değerleriyle güncelle
+            state.setStartTime(daylight.getSunrise());
+            state.setEndTime(daylight.getSunset());
+            state.setCurrentTime(daylight.getSunrise());
+            state.setSimulationStepMinutes(simStep);
 
             System.out.println("State updated. Reinitializing system...");
 
@@ -396,6 +467,9 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
         } catch (NumberFormatException e) {
             System.out.println("Error parsing numeric values: " + e.getMessage());
+            e.printStackTrace();
+        } catch (DateTimeParseException e) {
+            System.out.println("Error parsing date: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -417,17 +491,12 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         }
     }
 
-//    private void handleLocationUpdate() {
-//        try {
-//            double lat = Double.parseDouble(cp5.get(Textfield.class, "Latitude").getText());
-//            double lon = Double.parseDouble(cp5.get(Textfield.class, "Longitude").getText());
-//            simulationController.setLocation(lat, lon);
-//        } catch (NumberFormatException e) {
-//            println("Invalid location values");
-//        }
-//    }
     @Override
     public void draw() {
+        // Mouse GUI üzerindeyse kamerayı devre dışı bırak
+        if (cam != null) {
+            cam.setActive(!isMouseOverGUI());
+        }
         background(135, 206, 235); // Sky blue background
 
         simulationController.update();
@@ -503,5 +572,50 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
             cp5.dispose();
         }
         super.dispose();
+    }
+
+    // FresnelSimulator sınıfına eklenecek yeni metod
+    private boolean isMouseOverGUI() {
+        // Settings panel konumunu al
+        int guiX = width - 20 - GUI_PANEL_WIDTH;
+        int guiY = 50;
+
+        // Grup nesnesini al
+        Group settingsGroup = cp5.get(Group.class, "SETTINGS");
+        if (settingsGroup != null) {
+            // Grup açıksa tam yüksekliği, kapalıysa sadece başlık çubuğu yüksekliğini kullan
+            int effectiveHeight = settingsGroup.isOpen() ? GUI_PANEL_HEIGHT : GUI_BAR_HEIGHT;
+
+            return (mouseX >= guiX && mouseX <= guiX + GUI_PANEL_WIDTH
+                    && mouseY >= guiY && mouseY <= guiY + effectiveHeight);
+        }
+
+        return false;
+    }
+
+    // Mouse olaylarını ele almak için
+    @Override
+    public void mousePressed() {
+        if (isMouseOverGUI()) {
+            cam.setActive(false);
+        }
+    }
+
+    @Override
+    public void mouseReleased() {
+        // Mouse bırakıldığında kamerayı tekrar aktif et
+        // Ancak hala GUI üzerinde değilse
+        if (!isMouseOverGUI()) {
+            cam.setActive(true);
+        }
+    }
+
+    // Mouse wheel olayını özelleştirmek için
+    @Override
+    public void mouseWheel(MouseEvent event) {
+        if (isMouseOverGUI()) {
+            // GUI üzerindeyken wheel olayını engelle
+            return;
+        }
     }
 }
