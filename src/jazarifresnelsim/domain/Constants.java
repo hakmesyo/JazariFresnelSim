@@ -3,7 +3,7 @@ package jazarifresnelsim.domain;
 
 public final class Constants {
     // Reflector parameters (all dimensions in centimeters)
-    public static final int NUM_REFLECTORS = 4;          // Number of mirrors (2 left + 2 right)
+    public static final int NUM_REFLECTORS = 6;          // Number of mirrors (3 left + 3 right)
     public static final float RECEIVER_HEIGHT = 130;     // Height of receiver tube
     public static final float RECEIVER_DIAMETER = 16;    // Diameter of receiver tube
     public static final float REFLECTOR_WIDTH = 20;      // Width of each mirror
@@ -12,8 +12,10 @@ public final class Constants {
     public static final float SUPPORT_HEIGHT = 30;       // Height of mirror supports
 
     // Default location parameters
-    public static final double DEFAULT_LATITUDE = 37.962984;   // 37°56'N
-    public static final double DEFAULT_LONGITUDE = 41.850347;  // 41°57'E
+//    public static final double DEFAULT_LATITUDE = 37.962984;   // 37°56'N
+//    public static final double DEFAULT_LONGITUDE = 41.850347;  // 41°57'E
+    public static final double DEFAULT_LATITUDE = 37.9150;   
+    public static final double DEFAULT_LONGITUDE = 40.2500;
 
     // GUI Constants
     public static final int WINDOW_WIDTH = 1280;

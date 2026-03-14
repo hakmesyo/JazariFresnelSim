@@ -17,6 +17,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import static jazarifresnelsim.domain.Constants.*;
 import jazarifresnelsim.domain.DaylightTimes;
+import jazarifresnelsim.domain.ShadingDetector;
 import jazarifresnelsim.domain.SolarCalculator;
 import jazarifresnelsim.models.MirrorPosition;
 import jazarifresnelsim.ui.IGUIUpdateCallback;
@@ -43,7 +44,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
 
     @Override
     public void setup() {
-        surface.setTitle("Linear Fresnel Reflector Simulation");
+        surface.setTitle("Jazari Linear Fresnel Reflector Simulation");
 
         // Önce state'i oluştur
         state = new SimulationState();
@@ -516,7 +517,7 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
         textSize(14);
 
         int infoX = 20;
-        int infoY = height - 140;  // Adjusted for more info
+        int infoY = height - 160;  // Adjusted for more info
 
         String dateStr = state.getCurrentTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
         String timeStr = state.getCurrentTime().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -542,8 +543,9 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
                     .mapToDouble(m -> solarCalculator.calculateSpillageLoss(m, state))
                     .average()
                     .orElse(0.0);
+            ShadingDetector shadingDetector = new ShadingDetector();
             double avgBlocking = mirrors.stream()
-                    .mapToDouble(m -> solarCalculator.calculateBlockingAndShadingLoss(m, mirrors, state, sunPos))
+                    .mapToDouble(m -> shadingDetector.calculateBlockingAndShadingLoss(m, mirrors, state, sunPos))
                     .average()
                     .orElse(0.0);
 
@@ -551,6 +553,9 @@ public class FresnelSimulator extends PApplet implements IGUIUpdateCallback {
                     infoX, infoY + 100);
             text(String.format("Blocking Efficiency: %.1f%%", avgBlocking * 100),
                     infoX, infoY + 120);
+            
+            text(String.format("FPS: %.1f", frameRate),
+                infoX, infoY + 140);
         }
     }
 

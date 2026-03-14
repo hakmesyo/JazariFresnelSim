@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import static jazarifresnelsim.domain.Constants.*;
+import jazarifresnelsim.domain.MirrorTracker;
 import jazarifresnelsim.ui.IGUIUpdateCallback;
 
 public class SimulationController implements ISimulationController {
@@ -182,7 +183,7 @@ public class SimulationController implements ISimulationController {
 //        // Y ekseni etrafındaki dönme açısını hesapla
 //        return Math.toDegrees(Math.atan2(normalVector[0], normalVector[2]));
 //    }
-    @Override
+@Override
     public void updateMirrorPositions() {
         List<MirrorPosition> newPositions = new ArrayList<>();
         SolarPosition sunPos = state.getCurrentSolarPosition();
@@ -194,6 +195,9 @@ public class SimulationController implements ISimulationController {
         int numReflectors = state.getNumReflectors();
         float spacing = state.getReflectorSpacing();
         float supportHeight = state.getSupportHeight();
+        
+        // YENİ EKLENEN SINIF BURADA DEVREYE GİRİYOR
+        MirrorTracker tracker = new MirrorTracker();
 
         for (int i = 0; i < numReflectors; i++) {
             double offset = (i < numReflectors / 2)
@@ -201,8 +205,8 @@ public class SimulationController implements ISimulationController {
 
             double xOffset = offset * spacing;
 
-            // Now use solarCalculator instance to calculate angle
-            double rotationAngle = solarCalculator.calculateOptimalMirrorAngle(
+            // Artık SolarCalculator üzerinden değil, MirrorTracker üzerinden hesaplıyoruz
+            double rotationAngle = tracker.calculateOptimalMirrorAngle(
                     xOffset / 100.0, sunPos, state);
 
             newPositions.add(new MirrorPosition(
@@ -215,7 +219,6 @@ public class SimulationController implements ISimulationController {
 
         state.updateMirrorPositions(newPositions);
     }
-
     private void updateCurrentTime() {
         // Sadece current time'ı start time'a eşitleyelim
         state.setCurrentTime(state.getStartTime());

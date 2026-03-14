@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import jazarifresnelsim.domain.MirrorTracker;
 import jazarifresnelsim.models.MirrorPosition;
 import jazarifresnelsim.models.SimulationState;
 
@@ -56,7 +58,7 @@ public class FresnelDesignProblem {
     }
 
     public Map<LocalDateTime, Double> evaluateDesignForAllTimes(DesignParameters params) {
-        Map<LocalDateTime, Double> energyByTime = new HashMap<>();
+        Map<LocalDateTime, Double> energyByTime = new ConcurrentHashMap<>();
         SimulationState state = new SimulationState();
 
         // Set basic simulation parameters
@@ -68,7 +70,7 @@ public class FresnelDesignProblem {
         state.setReflectorSpacing((float) params.getMirrorSpacing());
         state.setNumReflectors(params.getNumberOfMirrors());
 
-        for (LocalDateTime time : evaluationTimes) {
+        evaluationTimes.parallelStream().forEach(time -> {
             SolarPosition sunPosition = solarCalculator.calculateSolarPosition(time);
 
             if (sunPosition.getAltitudeAngle() > 0) {
@@ -83,7 +85,7 @@ public class FresnelDesignProblem {
             } else {
                 energyByTime.put(time, 0.0);
             }
-        }
+        });
 
         return energyByTime;
     }
@@ -99,6 +101,7 @@ public class FresnelDesignProblem {
         List<MirrorPosition> positions = new ArrayList<>();
         int numReflectors = state.getNumReflectors();
         float spacing = state.getReflectorSpacing();
+        MirrorTracker tracker = new MirrorTracker();
 
         for (int i = 0; i < numReflectors; i++) {
             // Calculate mirror offset from center
@@ -108,8 +111,7 @@ public class FresnelDesignProblem {
             double xOffset = offset * spacing;
 
             // Calculate optimal rotation angle for this mirror
-            double rotationAngle = solarCalculator.calculateOptimalMirrorAngle(
-                    xOffset / 100.0, sunPos, state);
+            double rotationAngle = tracker.calculateOptimalMirrorAngle(xOffset / 100.0, sunPos, state);
 
             // Create mirror position with calculated parameters
             positions.add(new MirrorPosition(
