@@ -1,4 +1,4 @@
-package jazarifresnelsim.optimization;
+package jazarifresnelsim;
 
 import jazarifresnelsim.optimization.algorithms.*;
 import jazarifresnelsim.optimization.problem.*;
@@ -34,6 +34,10 @@ public class TestOptimization {
     private static final double LAT_RIYADH = 24.63;
     private static final double LON_RIYADH = 46.72;
     private static final int NUM_OPTIMIZATION_RUNS = 30;
+    private static final double LAT_BERLIN = 52.52;
+    private static final double LON_BERLIN = 13.405;
+    private static final double LAT_JEDDAH = 21.49;
+    private static final double LON_JEDDAH = 39.19;
 
     public static void main(String[] args) {
         printBanner();
@@ -281,14 +285,23 @@ public class TestOptimization {
         }
     }
 
-    // ================================================================
-    // TEST 2: EXTREME-ANGLE ANALYSIS
+// ================================================================
+    // TEST 2: EXTREME-ANGLE ANALYSIS — UPDATED LOCATIONS
     // ================================================================
     public static void runExtremeAngleAnalysis() {
-        System.out.println("=== TEST 2: Extreme-Angle Annual Error Analysis (Table 6) ===\n");
-        double[][] locs = {{LAT_DIYARBAKIR, LON_DIYARBAKIR}, {LAT_ALMERIA, LON_ALMERIA}, {LAT_RIYADH, LON_RIYADH}};
-        String[] names = {"Diyarbakir (37.96N)", "Almeria    (36.84N)", "Riyadh     (24.63N)"};
-        System.out.println(String.format("%-22s %10s %13s %14s %18s", "Location", "Daylight h", "h θT>55°", "Fraction(%)", "Yield Dev(%)"));
+        System.out.println("=== TEST 2: Extreme-Angle Annual Error Analysis (Table 8) ===\n");
+        double[][] locs = {
+            {LAT_DIYARBAKIR, LON_DIYARBAKIR},
+            {LAT_BERLIN, LON_BERLIN},
+            {LAT_JEDDAH, LON_JEDDAH}
+        };
+        String[] names = {
+            "Diyarbakir (37.96N)",
+            "Berlin     (52.52N)",
+            "Jeddah     (21.49N)"
+        };
+        System.out.println(String.format("%-22s %10s %13s %14s %18s",
+                "Location", "Daylight h", "h θT>55°", "Fraction(%)", "Yield Dev(%)"));
         System.out.println("-".repeat(80));
         for (int i = 0; i < 3; i++) {
             SolarCalculator calc = new SolarCalculator(locs[i][0], locs[i][1], 0);
@@ -298,12 +311,15 @@ public class TestOptimization {
                 for (int d = 1; d <= 28; d++) {
                     for (int h = 5; h <= 20; h++) {
                         try {
-                            SolarPosition pos = calc.calculateSolarPosition(LocalDateTime.of(2024, m, d, h, 0));
+                            SolarPosition pos = calc.calculateSolarPosition(
+                                    LocalDateTime.of(2024, m, d, h, 0));
                             if (pos.getAltitudeAngle() > 5.0) {
                                 total++;
                                 double dni = pos.getSolarIntensity();
-                                double aR = Math.toRadians(pos.getAltitudeAngle()), azR = Math.toRadians(pos.getAzimuthAngle());
-                                double thetaT = 90.0 - Math.abs(Math.toDegrees(Math.atan(Math.tan(aR) / Math.cos(azR))));
+                                double aR = Math.toRadians(pos.getAltitudeAngle());
+                                double azR = Math.toRadians(pos.getAzimuthAngle());
+                                double thetaT = 90.0 - Math.abs(
+                                        Math.toDegrees(Math.atan(Math.tan(aR) / Math.cos(azR))));
                                 totalE += dni * Math.max(0, Math.cos(Math.toRadians(thetaT)));
                                 if (thetaT > 55) {
                                     extreme++;
@@ -315,7 +331,10 @@ public class TestOptimization {
                     }
                 }
             }
-            System.out.println(String.format("%-22s %10d %13d %14.1f %18.1f", names[i], total, extreme, 100.0 * extreme / total, 100.0 * extremeE / totalE));
+            System.out.println(String.format("%-22s %10d %13d %14.1f %18.1f",
+                    names[i], total, extreme,
+                    100.0 * extreme / total,
+                    100.0 * extremeE / totalE));
         }
     }
 
