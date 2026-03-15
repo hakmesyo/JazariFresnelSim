@@ -1,4 +1,8 @@
-<h1 align="center">🔆 JazariFresnelSim</h1>
+<p align="center">
+  <img src="docs/banner.png" alt="JazariFresnelSim" width="800"/>
+</p>
+
+<h1 align="center">JazariFresnelSim</h1>
 
 <p align="center">
   <b>Rapid Optical–Thermal Simulation & Design Optimization of Linear Fresnel Reflectors</b>
@@ -30,8 +34,9 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
 - **Dimensionless design rules** — generalized sizing guidelines validated across multiple locations
 - **Interactive 3D visualization** — real-time mirror tracking, ray paths, and performance metrics
 
-<!-- Add your screenshot: save a 3D simulator screenshot as docs/screenshots/gui_screenshot.png -->
-<!-- <p align="center"><img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/></p> -->
+<p align="center">
+  <img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/>
+</p>
 
 > **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to Solar Energy (Elsevier), 2026.
 
