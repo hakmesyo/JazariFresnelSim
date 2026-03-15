@@ -94,7 +94,6 @@ You will see this menu:
   [6] Mirror Count Scaling
   [7] Run ALL Tests (comprehensive)
   [8] Generate Convergence Data (Fig. 9)
-  [9] Launch Interactive 3D Simulator
   [0] Exit
 ================================
 ```
