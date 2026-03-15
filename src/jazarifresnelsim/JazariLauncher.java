@@ -369,7 +369,7 @@ public class JazariLauncher extends JFrame {
         new Thread(() -> {
             try {
                 System.out.println("\n=== Running TestOptimization in embedded mode ===\n");
-                jazarifresnelsim.TestOptimization.main(new String[]{});
+                jazarifresnelsim.optimization.TestOptimization.main(new String[]{});
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -382,7 +382,7 @@ public class JazariLauncher extends JFrame {
     public static void main(String[] args) {
         // Check for CLI mode flag
         if (args.length > 0 && (args[0].equals("--cli") || args[0].equals("--terminal"))) {
-            jazarifresnelsim.TestOptimization.main(new String[]{});
+            jazarifresnelsim.optimization.TestOptimization.main(new String[]{});
             return;
         }
 

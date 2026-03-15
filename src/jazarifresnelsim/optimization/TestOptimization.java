@@ -1,4 +1,4 @@
-package jazarifresnelsim;
+package jazarifresnelsim.optimization;
 
 import jazarifresnelsim.optimization.algorithms.*;
 import jazarifresnelsim.optimization.problem.*;

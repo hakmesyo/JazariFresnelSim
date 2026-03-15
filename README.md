@@ -12,7 +12,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"/></a>
   <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-17%2B-orange.svg" alt="Java 17+"/></a>
   <a href="#"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg" alt="Platform"/></a>
-  <a href="#citation"><img src="https://img.shields.io/badge/Paper-Solar%20Energy%20(2026)-red.svg" alt="Paper"/></a>
+  <!-- <a href="#citation"><img src="https://img.shields.io/badge/Paper-Solar%20Energy%20(2026)-red.svg" alt="Paper"/></a> -->
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
   <img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/>
 </p>
 
-> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to Solar Energy (Elsevier), 2026.
+> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to .... , 2026.
 
 ---
 
@@ -82,7 +82,7 @@ You will see this menu:
 ================================================================
   JazariFresnelSim — Validation & Optimization Test Suite v2.1
   Paper: Rapid Optical-Thermal Design of LFR Systems
-  Journal: Solar Energy (Elsevier)
+  Journal: ....
 ================================================================
 
 ========== MAIN MENU ==========
@@ -300,7 +300,7 @@ If you use JazariFresnelSim in your research, please cite:
   author  = {Demirta{\c{s}}, Yunus and Ata{\c{s}}, Musa},
   title   = {Rapid Optical--Thermal Design of Linear Fresnel Reflectors: 
              An Open-Source Analytical Framework and Dimensionless Sizing Rules},
-  journal = {Solar Energy},
+  journal = {......},
   year    = {2026},
   note    = {Submitted},
   url     = {https://github.com/hakmesyo/JazariFresnelSim}
