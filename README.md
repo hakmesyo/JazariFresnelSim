@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="docs/banner.png" alt="JazariFresnelSim" width="800"/>
-</p>
-
-<h1 align="center">JazariFresnelSim</h1>
+<h1 align="center">🔆 JazariFresnelSim</h1>
 
 <p align="center">
   <b>Rapid Optical–Thermal Simulation & Design Optimization of Linear Fresnel Reflectors</b>
@@ -34,9 +30,8 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
 - **Dimensionless design rules** — generalized sizing guidelines validated across multiple locations
 - **Interactive 3D visualization** — real-time mirror tracking, ray paths, and performance metrics
 
-<p align="center">
-  <img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/>
-</p>
+<!-- Add your screenshot: save a 3D simulator screenshot as docs/screenshots/gui_screenshot.png -->
+<!-- <p align="center"><img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/></p> -->
 
 > **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to Solar Energy (Elsevier), 2026.
 
@@ -46,17 +41,34 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
 
 ### Prerequisites
 
-- **Java 17 or later** — [Download from Adoptium](https://adoptium.net/)
-- Verify installation: `java -version`
+- **Java 17 or later** — [Download from Oracle](https://www.oracle.com/tr/java/technologies/downloads/)
+- Verify installation: open a terminal and type `java -version`
 
-### Option A: Download and Run (no IDE needed)
+### Option A: Download and Run (easiest — no IDE needed)
+
+1. **Download** the latest release: [**⬇ JazariFresnelSim.zip**](https://github.com/hakmesyo/JazariFresnelSim/releases/latest/download/JazariFresnelSim.zip)
+2. **Extract** the ZIP to any folder
+3. **Double-click** `JazariFresnelSim.jar` inside the extracted folder
+4. The launcher window opens — choose **Interactive 3D Simulator** or **Validation & Optimization Tests**
+
+> **Important:** Do not move the JAR file out of its folder. The `lib/` and `natives/` folders must stay next to it.
+
+<p align="center">
+  <img src="docs/screenshots/launcher_screenshot.png" alt="JazariFresnelSim Launcher" width="500"/>
+</p>
+
+### Option B: Run from terminal
 
 ```bash
-# 1. Download the latest release
-wget https://github.com/hakmesyo/JazariFresnelSim/releases/latest/download/JazariFresnelSim.jar
+# Extract and run
+unzip JazariFresnelSim.zip
+cd JazariFresnelSim
 
-# 2. Run the interactive tool
+# Launch GUI
 java -jar JazariFresnelSim.jar
+
+# Or launch directly in CLI mode (no GUI)
+java -jar JazariFresnelSim.jar --cli
 ```
 
 You will see this menu:
@@ -82,13 +94,17 @@ You will see this menu:
 ================================
 ```
 
-### Option B: Build from source
+### Option C: Build from source
 
 ```bash
 git clone https://github.com/hakmesyo/JazariFresnelSim.git
 cd JazariFresnelSim
-mvn clean package        # or: gradle build
-java -jar target/JazariFresnelSim.jar
+```
+
+Open the project in **NetBeans** (or any Java IDE), set `jazarifresnelsim.JazariLauncher` as the main class, and run. Alternatively, build the JAR and run:
+
+```bash
+java -jar dist/JazariFresnelSim.jar
 ```
 
 ---
