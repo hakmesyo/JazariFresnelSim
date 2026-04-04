@@ -38,7 +38,7 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
   <img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/>
 </p>
 
-> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to *Solar Energy* (Elsevier), 2026.
+> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to ____.
 
 ---
 
