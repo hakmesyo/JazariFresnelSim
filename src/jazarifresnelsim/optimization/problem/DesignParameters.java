@@ -25,8 +25,8 @@ public class DesignParameters {
     public static final double MAX_MIRROR_WIDTH = 30.0;
 //    public static final double MIN_MIRROR_LENGTH = 50.0;
 //    public static final double MAX_MIRROR_LENGTH = 200.0;
-    public static final double MIN_MIRROR_SPACING = 20.0;
-    public static final double MAX_MIRROR_SPACING = 70.0;
+    public static final double MIN_MIRROR_SPACING = 15.0;
+    public static final double MAX_MIRROR_SPACING = 80.0;
     public static final int MIN_NUMBER_OF_MIRRORS = 2;
     public static final int MAX_NUMBER_OF_MIRRORS = 10;
 
