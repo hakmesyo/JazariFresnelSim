@@ -82,7 +82,7 @@ You will see this menu:
 ================================================================
   JazariFresnelSim — Validation & Optimization Test Suite v2.2
   Paper: Rapid Optical-Thermal Design of LFR Systems
-  Journal: Solar Energy (Elsevier), 2026
+  Journal: ____
 ================================================================
 
 ========== MAIN MENU ==========
@@ -315,7 +315,7 @@ If you use JazariFresnelSim in your research, please cite:
   author  = {Demirta{\c{s}}, Yunus and Ata{\c{s}}, Musa},
   title   = {Rapid Optical--Thermal Design of Linear Fresnel Reflectors:
              An Open-Source Analytical Framework and Dimensionless Sizing Rules},
-  journal = {Solar Energy},
+  journal = {_____},
   year    = {2026},
   note    = {Submitted},
   url     = {https://github.com/hakmesyo/JazariFresnelSim}
