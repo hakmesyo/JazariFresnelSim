@@ -1,27 +1,33 @@
 # Build çıktıları
 /build/
 /dist/
- 
+
 # Derlenmiş class dosyaları
 *.class
- 
+
 # NetBeans kullanıcıya özel ayarlar (bunlar kişisel, repoya girmemeli)
 /nbproject/private/
 nbproject/Makefile-*.mk
 nbproject/Package-*.bash
- 
+
 # Geçici ve cache dosyaları
 *.orig
 *.rej
 *~
 .DS_Store
 Thumbs.db
- 
+
 # Gereksiz arşivler (zaten kaynak kod var)
 # src.zip, src_v1.rar, src_v2.rar gibi dosyaları da hariç tutmak istersen:
 # *.zip
 # *.rar
- 
+
 # Log dosyaları
 *.log
- 
+
+# CSV veri dosyaları (simulation çıktıları)
+*.csv
+
+# Arşiv dosyaları
+*.zip
+*.rar
