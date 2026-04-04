@@ -8,11 +8,11 @@ import java.awt.geom.RoundRectangle2D;
 import processing.core.PApplet;
 
 /**
- * Modern launcher window for JazariFresnelSim.
- * Provides two entry points: Interactive 3D Simulator and Terminal Test Suite.
- * 
+ * Modern launcher window for JazariFresnelSim. Provides two entry points:
+ * Interactive 3D Simulator and Terminal Test Suite.
+ *
  * This is the main entry point when running the JAR file.
- * 
+ *
  * @author Yunus Demirtaş, Musa Ataş — Siirt University
  * @version 2.1
  */
@@ -82,7 +82,7 @@ public class JazariLauncher extends JFrame {
 
         // --- 3D Simulator Button ---
         JPanel simButton = createLaunchButton(
-                "\uD83C\uDF1E",  // 🌞
+                "\uD83C\uDF1E", // 🌞
                 "Interactive 3D Simulator",
                 "Real-time mirror tracking, ray visualization, and live performance metrics",
                 ACCENT_ORANGE,
@@ -93,7 +93,7 @@ public class JazariLauncher extends JFrame {
 
         // --- Terminal Tests Button ---
         JPanel termButton = createLaunchButton(
-                "\uD83D\uDCCA",  // 📊
+                "\uD83D\uDCCA", // 📊
                 "Validation & Optimization Tests",
                 "Reproduce all paper results: parametric sweeps, optimization, convergence data",
                 ACCENT_BLUE,
@@ -110,8 +110,8 @@ public class JazariLauncher extends JFrame {
         mainPanel.add(Box.createVerticalStrut(12));
 
         JLabel footer = new JLabel(
-                "<html><center>Siirt University \u2022 Department of Computer & Mechanical Engineering<br>" +
-                "<font color='#64748B'>MIT License \u2022 github.com/hakmesyo/JazariFresnelSim</font></center></html>",
+                "<html><center>Siirt University \u2022 Department of Computer & Mechanical Engineering<br>"
+                + "<font color='#64748B'>MIT License \u2022 github.com/hakmesyo/JazariFresnelSim</font></center></html>",
                 SwingConstants.CENTER);
         footer.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         footer.setForeground(TEXT_SECONDARY);
@@ -123,14 +123,15 @@ public class JazariLauncher extends JFrame {
         // Set icon if available
         try {
             setIconImage(new ImageIcon(getClass().getResource("/icon.png")).getImage());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     /**
      * Creates a styled launch button card.
      */
     private JPanel createLaunchButton(String emoji, String titleText, String descText,
-                                       Color accentColor, ActionListener action) {
+            Color accentColor, ActionListener action) {
         JPanel card = new JPanel() {
             private boolean hovered = false;
 
@@ -224,71 +225,84 @@ public class JazariLauncher extends JFrame {
     }
 
     /**
-     * Launches the Processing-based 3D interactive simulator.
-     * Uses a separate process with correct native library paths to avoid JOGL DLL issues.
+     * Launches the Processing-based 3D interactive simulator. Uses a separate
+     * process with correct native library paths to avoid JOGL DLL issues.
+     */
+    /**
+     * Launches the Processing-based 3D interactive simulator. Uses a separate
+     * process with correct native library paths to avoid JOGL DLL issues.
      */
     private void launch3DSimulator() {
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         new Thread(() -> {
             try {
-                // Get paths
                 String javaHome = System.getProperty("java.home");
                 String javaBin = javaHome + java.io.File.separator + "bin" + java.io.File.separator + "java";
-                java.io.File jarFile = new java.io.File(
+
+                java.io.File execLocation = new java.io.File(
                         JazariLauncher.class.getProtectionDomain()
                                 .getCodeSource().getLocation().toURI());
-                String jarPath = jarFile.getAbsolutePath();
-                String jarDir = jarFile.getParent();
+                String execPath = execLocation.getAbsolutePath();
+                java.io.File execDir = execLocation.getParentFile();
 
-                // Build classpath: JAR + all lib JARs
-                StringBuilder cp = new StringBuilder(jarPath);
-                java.io.File libDir = new java.io.File(jarDir, "lib");
-                if (libDir.exists() && libDir.isDirectory()) {
-                    for (java.io.File f : libDir.listFiles()) {
-                        if (f.getName().endsWith(".jar")) {
-                            cp.append(java.io.File.pathSeparator).append(f.getAbsolutePath());
-                        }
+                String cp = System.getProperty("java.class.path");
+
+                // JAR'dan çalışıyorsa "libs" klasörünü ekle
+                if (execPath.toLowerCase().endsWith(".jar")) {
+                    java.io.File libDir = new java.io.File(execDir, "libs");
+                    if (libDir.exists() && libDir.isDirectory()) {
+                        cp += java.io.File.pathSeparator + libDir.getAbsolutePath() + java.io.File.separator + "*";
                     }
                 }
 
-                // Find native libraries directory
-                String nativePath = jarDir + java.io.File.separator + "natives" 
-                        + java.io.File.separator + "windows-amd64";
-                java.io.File nativeDir = new java.io.File(nativePath);
-                if (!nativeDir.exists()) {
-                    // Try alternative locations
-                    nativeDir = new java.io.File(jarDir, "natives");
-                    if (!nativeDir.exists()) {
-                        nativeDir = new java.io.File(jarDir, "lib");
+                // --- KURŞUN GEÇİRMEZ NATIVES KLASÖRÜ BULUCU ---
+                java.io.File nativeBaseDir = null;
+
+                // Olası tüm yerleri sırayla kontrol et
+                java.io.File[] possibleLocations = {
+                    new java.io.File(execDir, "natives"), // 1. JAR'ın yanı (dist/natives)
+                    new java.io.File(System.getProperty("user.dir"), "natives"), // 2. NetBeans Proje Ana Dizini
+                    new java.io.File(execDir.getParentFile(), "natives"), // 3. Fallback (bir üst klasör)
+                    new java.io.File(execDir.getParentFile().getParentFile(), "natives") // 4. Fallback (iki üst klasör)
+                };
+
+                // Hangisi fiziksel olarak varsa onu seç
+                for (java.io.File loc : possibleLocations) {
+                    if (loc != null && loc.exists() && loc.isDirectory()) {
+                        nativeBaseDir = loc;
+                        break;
                     }
-                    nativePath = nativeDir.getAbsolutePath();
                 }
 
-                // Build the command
+                if (nativeBaseDir == null) {
+                    throw new RuntimeException("Kritik Hata: 'natives' klasörü hiçbir yerde bulunamadı!");
+                }
+
+                // Klasörü bulduk, şimdi içindeki windows-amd64'ü göster
+                java.io.File exactNativeDir = new java.io.File(nativeBaseDir, "windows-amd64");
+
                 ProcessBuilder pb = new ProcessBuilder(
                         javaBin,
-                        "-Djava.library.path=" + nativePath,
-                        "-cp", cp.toString(),
+                        "-Djava.library.path=" + exactNativeDir.getAbsolutePath(),
+                        "-cp", cp,
                         "jazarifresnelsim.FresnelSimulator"
                 );
-                pb.directory(new java.io.File(jarDir));
+
+                pb.directory(execDir);
                 pb.inheritIO();
                 pb.start();
 
-                // Minimize launcher
                 SwingUtilities.invokeLater(() -> setState(Frame.ICONIFIED));
 
             } catch (Exception ex) {
+                ex.printStackTrace();
                 SwingUtilities.invokeLater(() -> {
-                    // Fallback: try launching in-process (works when run from IDE)
                     try {
                         PApplet.main(new String[]{FresnelSimulator.class.getName()});
                         setState(Frame.ICONIFIED);
                     } catch (Exception ex2) {
                         JOptionPane.showMessageDialog(this,
-                                "Error launching 3D Simulator:\n" + ex2.getMessage()
-                                + "\n\nMake sure the 'natives' and 'lib' folders are"
-                                + "\nin the same directory as the JAR file.",
+                                "Error launching 3D Simulator:\n" + ex2.getMessage(),
                                 "Launch Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
@@ -298,6 +312,73 @@ public class JazariLauncher extends JFrame {
         }).start();
     }
 
+//    private void launch3DSimulator() {
+//        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+//        new Thread(() -> {
+//            try {
+//                String javaHome = System.getProperty("java.home");
+//                String javaBin = javaHome + java.io.File.separator + "bin" + java.io.File.separator + "java";
+//
+//                java.io.File execLocation = new java.io.File(
+//                        JazariLauncher.class.getProtectionDomain()
+//                                .getCodeSource().getLocation().toURI());
+//                String execPath = execLocation.getAbsolutePath();
+//                java.io.File execDir = execLocation.getParentFile();
+//
+//                String cp = System.getProperty("java.class.path");
+//
+//                // JAR'dan çalışıyorsa "libs" klasörünü bul (Ekran görüntünüzde klasörün adı "libs")
+//                if (execPath.toLowerCase().endsWith(".jar")) {
+//                    java.io.File libDir = new java.io.File(execDir, "libs");
+//                    if (libDir.exists() && libDir.isDirectory()) {
+//                        cp += java.io.File.pathSeparator + libDir.getAbsolutePath() + java.io.File.separator + "*";
+//                    }
+//                }
+//
+//                // EKRAN GÖRÜNTÜNÜZDEKİ NATIVES KLASÖRÜNÜ BULMA MANTIĞI
+//                java.io.File nativeBaseDir;
+//                // Eğer NetBeans içinden çalışıyorsak (dizin .../build/classes ise)
+//                if (execDir.getName().equals("classes") && execDir.getParentFile().getName().equals("build")) {
+//                    // Proje ana dizinindeki "natives" klasörüne git
+//                    nativeBaseDir = new java.io.File(execDir.getParentFile().getParentFile(), "natives");
+//                } else {
+//                    // JAR dosyasından çalışıyorsak, JAR'ın yanındaki "natives" klasörüne bak
+//                    nativeBaseDir = new java.io.File(execDir, "natives");
+//                }
+//
+//                // Windows için alt klasörü seçiyoruz (Ekran görüntünüzdeki windows-amd64)
+//                java.io.File exactNativeDir = new java.io.File(nativeBaseDir, "windows-amd64");
+//
+//                ProcessBuilder pb = new ProcessBuilder(
+//                        javaBin,
+//                        "-Djava.library.path=" + exactNativeDir.getAbsolutePath(),
+//                        "-cp", cp,
+//                        "jazarifresnelsim.FresnelSimulator"
+//                );
+//
+//                pb.directory(execDir);
+//                pb.inheritIO();
+//                pb.start();
+//
+//                SwingUtilities.invokeLater(() -> setState(Frame.ICONIFIED));
+//
+//            } catch (Exception ex) {
+//                ex.printStackTrace();
+//                SwingUtilities.invokeLater(() -> {
+//                    try {
+//                        PApplet.main(new String[]{FresnelSimulator.class.getName()});
+//                        setState(Frame.ICONIFIED);
+//                    } catch (Exception ex2) {
+//                        JOptionPane.showMessageDialog(this,
+//                                "Error launching 3D Simulator:\n" + ex2.getMessage(),
+//                                "Launch Error", JOptionPane.ERROR_MESSAGE);
+//                    }
+//                });
+//            } finally {
+//                SwingUtilities.invokeLater(() -> setCursor(Cursor.getDefaultCursor()));
+//            }
+//        }).start();
+//    }
     /**
      * Launches the terminal-based test suite in a new console window.
      */
@@ -306,15 +387,15 @@ public class JazariLauncher extends JFrame {
         new Thread(() -> {
             try {
                 String os = System.getProperty("os.name").toLowerCase();
-                
+
                 // Get java executable path (handle spaces)
                 String javaHome = System.getProperty("java.home");
                 String javaBin = javaHome + java.io.File.separator + "bin" + java.io.File.separator + "java";
-                
+
                 // Get JAR/classpath location (handle URI encoding and spaces)
                 java.io.File jarFile = new java.io.File(
-                    JazariLauncher.class.getProtectionDomain()
-                        .getCodeSource().getLocation().toURI());
+                        JazariLauncher.class.getProtectionDomain()
+                                .getCodeSource().getLocation().toURI());
                 String jarPath = jarFile.getAbsolutePath();
 
                 ProcessBuilder pb;
@@ -338,9 +419,9 @@ public class JazariLauncher extends JFrame {
                     // Linux: try common terminal emulators
                     String cmd = "'" + javaBin + "' -cp '" + jarPath + "' jazarifresnelsim.optimization.TestOptimization; read -p 'Press Enter to close...'";
                     pb = new ProcessBuilder("bash", "-c",
-                            "x-terminal-emulator -e bash -c \"" + cmd + "\" 2>/dev/null || " +
-                            "gnome-terminal -- bash -c \"" + cmd + "\" 2>/dev/null || " +
-                            "xterm -e bash -c \"" + cmd + "\" 2>/dev/null");
+                            "x-terminal-emulator -e bash -c \"" + cmd + "\" 2>/dev/null || "
+                            + "gnome-terminal -- bash -c \"" + cmd + "\" 2>/dev/null || "
+                            + "xterm -e bash -c \"" + cmd + "\" 2>/dev/null");
                 }
 
                 pb.start();
@@ -389,7 +470,8 @@ public class JazariLauncher extends JFrame {
         // Set system look and feel for native appearance
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // Enable font anti-aliasing
         System.setProperty("awt.useSystemAAFontSettings", "on");
