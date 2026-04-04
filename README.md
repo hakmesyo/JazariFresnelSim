@@ -12,7 +12,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"/></a>
   <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-17%2B-orange.svg" alt="Java 17+"/></a>
   <a href="#"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg" alt="Platform"/></a>
-  <!-- <a href="#citation"><img src="https://img.shields.io/badge/Paper-Solar%20Energy%20(2026)-red.svg" alt="Paper"/></a> -->
+  <a href="#citation"><img src="https://img.shields.io/badge/Paper-Solar%20Energy%20(2026)-red.svg" alt="Paper"/></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ JazariFresnelSim is an **open-source analytical simulation framework** for the o
   <img src="docs/screenshots/gui_screenshot.png" alt="Interactive 3D Environment" width="700"/>
 </p>
 
-> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to .... , 2026.
+> **Accompanying paper:** *"Rapid Optical–Thermal Design of Linear Fresnel Reflectors: An Open-Source Analytical Framework and Dimensionless Sizing Rules"* — submitted to *Solar Energy* (Elsevier), 2026.
 
 ---
 
@@ -80,21 +80,25 @@ You will see this menu:
 
 ```
 ================================================================
-  JazariFresnelSim — Validation & Optimization Test Suite v2.1
+  JazariFresnelSim — Validation & Optimization Test Suite v2.2
   Paper: Rapid Optical-Thermal Design of LFR Systems
-  Journal: ....
+  Journal: Solar Energy (Elsevier), 2026
 ================================================================
 
 ========== MAIN MENU ==========
-  [1] Metaheuristic Optimization (GA, PSO, SA)
-  [2] Extreme-Angle Annual Error Analysis
-  [3] Temporal Discretization Sensitivity
-  [4] Parametric Sweep: Mirror Spacing
-  [5] Parametric Sweep: Receiver Height
-  [6] Mirror Count Scaling
-  [7] Run ALL Tests (comprehensive)
-  [8] Generate Convergence Data (Fig. 9)
-  [0] Exit
+  --- Tabular results (manuscript order) ---
+  [1]  Extreme-Angle Error Analysis      — Table 9
+  [2]  Mirror Count Scaling              — Table 13
+  [3]  Metaheuristic Optimization        — Tables 14-15
+  [4]  Temporal Discretization           — Table 16
+  --- Figure data export (CSV + Python) ---
+  [5]  Spacing Sweep Export              — Fig. 6
+  [6]  Height Sweep Export               — Fig. 7
+  [7]  Daily Efficiency Profile Export   — Fig. 8
+  [8]  Convergence Data Export           — Fig. 9
+  ---
+  [9]  Run ALL Tests
+  [0]  Exit
 ================================
 ```
 
@@ -140,9 +144,11 @@ Three metaheuristic algorithms with 5-parameter simultaneous optimization:
 
 | Algorithm | Execution time | Best yield | Std. dev. |
 |-----------|---------------|------------|-----------|
-| Simulated Annealing | 0.58 s | 821.2 kW/m² | 38.8 |
-| Genetic Algorithm | 2.71 s | 840.2 kW/m² | 15.4 |
-| Particle Swarm (PSO) | 1.80 s | 861.1 kW/m² | 28.8 |
+| Simulated Annealing | 0.52 s | 566.7 kW/m² | 49.1 |
+| Genetic Algorithm | 2.44 s | 617.7 kW/m² | 15.9 |
+| Particle Swarm (PSO) | 1.62 s | 602.6 kW/m² | 16.1 |
+
+> Yield values correspond to the simplified thermal model (η_th = 0.70); relative algorithm rankings are independent of this assumption.
 
 ---
 
@@ -154,38 +160,42 @@ Every figure and table in the manuscript can be reproduced from this repository:
 
 | Paper Reference | Menu Option | Output |
 |----------------|-------------|--------|
-| Table 6 (Extreme-angle analysis) | `[2]` | Console output |
-| Table 7 (Mirror count scaling) | `[6]` | Console output |
-| Table 10 (Optimization results) | `[1]` | Console output |
-| Table 14 (Temporal sensitivity) | `[3]` | Console output |
-| Figure 6 (Spacing sweep) | `[4]` | Console output |
-| Figure 7 (Height sweep) | `[5]` | Console output |
-| Figure 9 (Convergence plot) | `[8]` | CSV files → Python plot |
+| Table 9 (Extreme-angle analysis) | `[1]` | Console output |
+| Table 13 (Mirror count scaling) | `[2]` | Console output |
+| Tables 14–15 (Optimization results) | `[3]` | Console output |
+| Table 16 (Temporal sensitivity) | `[4]` | Console output |
+| Figure 6 (Spacing sweep) | `[5]` | `spacing_sweep.csv` → Python plot |
+| Figure 7 (Height sweep) | `[6]` | `height_sweep.csv` → Python plot |
+| Figure 8 (Daily efficiency profiles) | `[7]` | `daily_efficiency_profile.csv` → Python plot |
+| Figure 9 (Convergence plot) | `[8]` | `convergence_*.csv` → Python plot |
 
-**To reproduce Figure 9:**
+**To reproduce Figures 6–9:**
 
 ```bash
-# Step 1: Generate convergence data (runs 30× each for SA, GA, PSO)
+# Step 1: Generate data
 java -jar JazariFresnelSim.jar
-# Select option [8], wait ~2.5 minutes
+# Select the relevant menu option, e.g. [8] for convergence data (~2.5 min)
 
 # Step 2: Plot with Python
-pip install matplotlib pandas numpy
-python scripts/plot_convergence.py
-# Output: fig_convergence.pdf
+pip install matplotlib numpy
+python scripts/plot_figure6.py   # Fig. 6 — shading loss vs p/w
+python scripts/plot_figure7.py   # Fig. 7 — energy vs receiver height
+python scripts/plot_figure8.py   # Fig. 8 — daily efficiency profiles
+python scripts/plot_convergence.py  # Fig. 9 — convergence histories
 ```
 
 The archived CSV files (`convergence_SA.csv`, `convergence_GA.csv`, `convergence_PSO.csv`) are included in the `data/` directory for immediate plotting without re-running the optimization.
 
 ### Dimensionless Design Rules
 
-The framework derives three sizing rules validated across Diyarbakır (37.96°N), Berlin (52.52°N), and Jeddah (21.49°N):
+The framework derives two sizing rules validated across Diyarbakır (37.96°N), Berlin (52.52°N), and Jeddah (21.49°N):
 
 | Rule | Formula | Meaning |
 |------|---------|---------|
-| **Rule 1** | p/w > 2.5 | Shading losses fall below 2% |
-| **Rule 2** | H_r/W_f ≈ 1.0 | Energy output peaks; diminishing returns beyond |
-| **Rule 3** | N_opt ≈ 0.6 · W_f/p | Optimal mirror count for a given field width |
+| **Rule 1** | p/w > 3.0 | Daily-averaged shading losses fall below 2% |
+| **Rule 2** | N_opt ≈ 0.6 · W_f/p | Optimal mirror count for a given field width |
+
+> **Receiver height guidance:** No universal optimal H_r/W_f ratio exists across different field geometries. A practical upper bound of H_r < 1.5 × W_f is recommended to avoid the region of diminishing optical returns at elevated structural cost.
 
 ### Using as a Library
 
@@ -225,11 +235,11 @@ All design parameters can be adjusted programmatically:
 
 ```java
 DesignParameters params = new DesignParameters(
-    130.0,   // receiverHeight (cm) — range: [30, 300]
+    130.0,   // receiverHeight (cm)   — range: [30, 300]
     16.0,    // receiverDiameter (cm) — range: [10, 50]
-    20.0,    // mirrorWidth (cm) — range: [5, 30]
-    30.0,    // mirrorSpacing (cm) — range: [20, 70]
-    6        // numberOfMirrors — range: [2, 10]
+    20.0,    // mirrorWidth (cm)      — range: [5, 30]
+    30.0,    // mirrorSpacing (cm)    — range: [15, 80]
+    6        // numberOfMirrors       — range: [2, 10]
 );
 ```
 
@@ -240,11 +250,11 @@ DesignParameters params = new DesignParameters(
 The framework is validated through a 5-level hierarchy:
 
 ```
-Level 1: Solar Position  ──→  NREL SPA          ──→  RMSE < 0.25°
-Level 2: Mirror Tracking ──→  Closed-form        ──→  Error < 10⁻⁶°
-Level 3: Mirror Angles   ──→  Barbón et al.      ──→  Max error 0.04°
-Level 4: Intercept Factor──→  Santos et al. MCRT  ──→  Agreement to 55°
-Level 5: System Optical  ──→  SolTrace (5 geom.) ──→  RMSE 2.1 pp
+Level 1: Solar Position   ──→  NREL SPA            ──→  RMSE < 0.25°
+Level 2: Mirror Tracking  ──→  Closed-form          ──→  Error < 10⁻⁶°
+Level 3: Mirror Angles    ──→  Barbón et al.        ──→  Max error 0.04°
+Level 4: Intercept Factor ──→  Santos et al. MCRT   ──→  Agreement to 55°
+Level 5: System Optical   ──→  SolTrace (5 geom.)   ──→  RMSE 2.1 pp
 ```
 
 ---
@@ -267,11 +277,17 @@ JazariFresnelSim/
 │   ├── test/               # Validation benchmarks
 │   └── ui/                 # Processing-based 3D renderer
 ├── scripts/
-│   └── plot_convergence.py # Python script for Figure 9
+│   ├── plot_figure6.py     # Fig. 6 — shading loss vs p/w ratio
+│   ├── plot_figure7.py     # Fig. 7 — energy vs receiver height
+│   ├── plot_figure8.py     # Fig. 8 — daily optical efficiency profiles
+│   └── plot_convergence.py # Fig. 9 — convergence histories
 ├── data/
-│   ├── convergence_SA.csv  # Archived optimization data
-│   ├── convergence_GA.csv
-│   └── convergence_PSO.csv
+│   ├── spacing_sweep.csv           # Fig. 6 data
+│   ├── height_sweep.csv            # Fig. 7 data
+│   ├── daily_efficiency_profile.csv # Fig. 8 data
+│   ├── convergence_SA.csv          # Fig. 9 data — Simulated Annealing
+│   ├── convergence_GA.csv          # Fig. 9 data — Genetic Algorithm
+│   └── convergence_PSO.csv         # Fig. 9 data — Particle Swarm
 ├── docs/                   # Documentation and screenshots
 └── README.md
 ```
@@ -297,9 +313,9 @@ If you use JazariFresnelSim in your research, please cite:
 ```bibtex
 @article{demirtas2026jazari,
   author  = {Demirta{\c{s}}, Yunus and Ata{\c{s}}, Musa},
-  title   = {Rapid Optical--Thermal Design of Linear Fresnel Reflectors: 
+  title   = {Rapid Optical--Thermal Design of Linear Fresnel Reflectors:
              An Open-Source Analytical Framework and Dimensionless Sizing Rules},
-  journal = {......},
+  journal = {Solar Energy},
   year    = {2026},
   note    = {Submitted},
   url     = {https://github.com/hakmesyo/JazariFresnelSim}
