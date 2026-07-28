@@ -1,32 +1,34 @@
 package jazarifresnelsim;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import jazarifresnelsim.ui.DesignFresnelSystemFrame;
+import processing.core.PApplet;
+
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
-import processing.core.PApplet;
 
 /**
  * Modern launcher window for JazariFresnelSim. Provides two entry points:
- * Interactive 3D Simulator and Terminal Test Suite.
+ * Interactive 3D Simulator and Design Fresnel System.
  *
  * This is the main entry point when running the JAR file.
  *
  * @author Yunus Demirtaş, Musa Ataş — Siirt University
- * @version 2.1
+ * @version 3.0
  */
 public class JazariLauncher extends JFrame {
 
-    // Color palette
-    private static final Color BG_DARK = new Color(15, 23, 42);
-    private static final Color BG_CARD = new Color(30, 41, 59);
-    private static final Color ACCENT_ORANGE = new Color(249, 115, 22);
+    // Color palette - DesignFresnelSystemFrame ile uyumlu
+    private static final Color BG_DARK = new Color(11, 14, 20);      // #0B0E14
+    private static final Color BG_CARD = new Color(21, 27, 38);      // #151B26
+    private static final Color ACCENT_ORANGE = new Color(255, 106, 0); // #FF6A00
     private static final Color ACCENT_BLUE = new Color(56, 189, 248);
-    private static final Color ACCENT_GREEN = new Color(34, 197, 94);
-    private static final Color TEXT_PRIMARY = new Color(248, 250, 252);
+    private static final Color TEXT_PRIMARY = new Color(240, 240, 240);
     private static final Color TEXT_SECONDARY = new Color(148, 163, 184);
-    private static final Color BORDER_COLOR = new Color(51, 65, 85);
+    private static final Color BORDER_COLOR = new Color(45, 55, 72);
 
     public JazariLauncher() {
         setTitle("JazariFresnelSim");
@@ -66,7 +68,7 @@ public class JazariLauncher extends JFrame {
         mainPanel.add(Box.createVerticalStrut(6));
 
         // Version + Paper badge
-        JLabel version = new JLabel("v2.1  \u2022  Solar Energy (Elsevier) 2026", SwingConstants.CENTER);
+        JLabel version = new JLabel("v3.0  •  Solar Energy (Elsevier) 2026", SwingConstants.CENTER);
         version.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         version.setForeground(new Color(100, 116, 139));
         version.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -91,15 +93,15 @@ public class JazariLauncher extends JFrame {
         mainPanel.add(simButton);
         mainPanel.add(Box.createVerticalStrut(16));
 
-        // --- Terminal Tests Button ---
-        JPanel termButton = createLaunchButton(
+        // --- Design Fresnel System Button ---
+        JPanel designButton = createLaunchButton(
                 "\uD83D\uDCCA", // 📊
-                "Validation & Optimization Tests",
-                "Reproduce all paper results: parametric sweeps, optimization, convergence data",
+                "Design Fresnel System",
+                "Configure parameters, run validations, and design new Fresnel systems",
                 ACCENT_BLUE,
-                e -> launchTerminalTests()
+                e -> openDesignFresnelSystem()
         );
-        mainPanel.add(termButton);
+        mainPanel.add(designButton);
         mainPanel.add(Box.createVerticalStrut(28));
 
         // --- Footer ---
@@ -110,8 +112,8 @@ public class JazariLauncher extends JFrame {
         mainPanel.add(Box.createVerticalStrut(12));
 
         JLabel footer = new JLabel(
-                "<html><center>Siirt University \u2022 Department of Computer & Mechanical Engineering<br>"
-                + "<font color='#64748B'>MIT License \u2022 github.com/hakmesyo/JazariFresnelSim</font></center></html>",
+                "<html><center>Siirt University • Department of Computer & Mechanical Engineering<br>"
+                + "<font color='#64748B'>MIT License • github.com/hakmesyo/JazariFresnelSim</font></center></html>",
                 SwingConstants.CENTER);
         footer.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         footer.setForeground(TEXT_SECONDARY);
@@ -164,7 +166,7 @@ public class JazariLauncher extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 // Background
-                Color bg = hovered ? new Color(40, 52, 72) : BG_CARD;
+                Color bg = hovered ? new Color(30, 40, 55) : BG_CARD;
                 g2.setColor(bg);
                 g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 16, 16));
 
@@ -214,7 +216,7 @@ public class JazariLauncher extends JFrame {
         card.add(textPanel, BorderLayout.CENTER);
 
         // Arrow
-        JLabel arrow = new JLabel("\u276F"); // ❯
+        JLabel arrow = new JLabel("❯");
         arrow.setFont(new Font("Segoe UI", Font.BOLD, 20));
         arrow.setForeground(TEXT_SECONDARY);
         arrow.setHorizontalAlignment(SwingConstants.CENTER);
@@ -225,9 +227,17 @@ public class JazariLauncher extends JFrame {
     }
 
     /**
-     * Launches the Processing-based 3D interactive simulator. Uses a separate
-     * process with correct native library paths to avoid JOGL DLL issues.
+     * Opens the new Design Fresnel System window.
+     * Replaces the old terminal-based test suite.
      */
+    private void openDesignFresnelSystem() {
+        SwingUtilities.invokeLater(() -> {
+            DesignFresnelSystemFrame frame = new DesignFresnelSystemFrame();
+            frame.setVisible(true);
+            // İstersen launcher'ı gizle: this.setVisible(false);
+        });
+    }
+
     /**
      * Launches the Processing-based 3D interactive simulator. Uses a separate
      * process with correct native library paths to avoid JOGL DLL issues.
@@ -255,18 +265,15 @@ public class JazariLauncher extends JFrame {
                     }
                 }
 
-                // --- KURŞUN GEÇİRMEZ NATIVES KLASÖRÜ BULUCU ---
+                // Kurşun geçirmez natives klasörü bulucu
                 java.io.File nativeBaseDir = null;
-
-                // Olası tüm yerleri sırayla kontrol et
                 java.io.File[] possibleLocations = {
-                    new java.io.File(execDir, "natives"), // 1. JAR'ın yanı (dist/natives)
-                    new java.io.File(System.getProperty("user.dir"), "natives"), // 2. NetBeans Proje Ana Dizini
-                    new java.io.File(execDir.getParentFile(), "natives"), // 3. Fallback (bir üst klasör)
-                    new java.io.File(execDir.getParentFile().getParentFile(), "natives") // 4. Fallback (iki üst klasör)
+                    new java.io.File(execDir, "natives"),
+                    new java.io.File(System.getProperty("user.dir"), "natives"),
+                    new java.io.File(execDir.getParentFile(), "natives"),
+                    new java.io.File(execDir.getParentFile().getParentFile(), "natives")
                 };
 
-                // Hangisi fiziksel olarak varsa onu seç
                 for (java.io.File loc : possibleLocations) {
                     if (loc != null && loc.exists() && loc.isDirectory()) {
                         nativeBaseDir = loc;
@@ -278,7 +285,6 @@ public class JazariLauncher extends JFrame {
                     throw new RuntimeException("Kritik Hata: 'natives' klasörü hiçbir yerde bulunamadı!");
                 }
 
-                // Klasörü bulduk, şimdi içindeki windows-amd64'ü göster
                 java.io.File exactNativeDir = new java.io.File(nativeBaseDir, "windows-amd64");
 
                 ProcessBuilder pb = new ProcessBuilder(
@@ -312,168 +318,14 @@ public class JazariLauncher extends JFrame {
         }).start();
     }
 
-//    private void launch3DSimulator() {
-//        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-//        new Thread(() -> {
-//            try {
-//                String javaHome = System.getProperty("java.home");
-//                String javaBin = javaHome + java.io.File.separator + "bin" + java.io.File.separator + "java";
-//
-//                java.io.File execLocation = new java.io.File(
-//                        JazariLauncher.class.getProtectionDomain()
-//                                .getCodeSource().getLocation().toURI());
-//                String execPath = execLocation.getAbsolutePath();
-//                java.io.File execDir = execLocation.getParentFile();
-//
-//                String cp = System.getProperty("java.class.path");
-//
-//                // JAR'dan çalışıyorsa "libs" klasörünü bul (Ekran görüntünüzde klasörün adı "libs")
-//                if (execPath.toLowerCase().endsWith(".jar")) {
-//                    java.io.File libDir = new java.io.File(execDir, "libs");
-//                    if (libDir.exists() && libDir.isDirectory()) {
-//                        cp += java.io.File.pathSeparator + libDir.getAbsolutePath() + java.io.File.separator + "*";
-//                    }
-//                }
-//
-//                // EKRAN GÖRÜNTÜNÜZDEKİ NATIVES KLASÖRÜNÜ BULMA MANTIĞI
-//                java.io.File nativeBaseDir;
-//                // Eğer NetBeans içinden çalışıyorsak (dizin .../build/classes ise)
-//                if (execDir.getName().equals("classes") && execDir.getParentFile().getName().equals("build")) {
-//                    // Proje ana dizinindeki "natives" klasörüne git
-//                    nativeBaseDir = new java.io.File(execDir.getParentFile().getParentFile(), "natives");
-//                } else {
-//                    // JAR dosyasından çalışıyorsak, JAR'ın yanındaki "natives" klasörüne bak
-//                    nativeBaseDir = new java.io.File(execDir, "natives");
-//                }
-//
-//                // Windows için alt klasörü seçiyoruz (Ekran görüntünüzdeki windows-amd64)
-//                java.io.File exactNativeDir = new java.io.File(nativeBaseDir, "windows-amd64");
-//
-//                ProcessBuilder pb = new ProcessBuilder(
-//                        javaBin,
-//                        "-Djava.library.path=" + exactNativeDir.getAbsolutePath(),
-//                        "-cp", cp,
-//                        "jazarifresnelsim.FresnelSimulator"
-//                );
-//
-//                pb.directory(execDir);
-//                pb.inheritIO();
-//                pb.start();
-//
-//                SwingUtilities.invokeLater(() -> setState(Frame.ICONIFIED));
-//
-//            } catch (Exception ex) {
-//                ex.printStackTrace();
-//                SwingUtilities.invokeLater(() -> {
-//                    try {
-//                        PApplet.main(new String[]{FresnelSimulator.class.getName()});
-//                        setState(Frame.ICONIFIED);
-//                    } catch (Exception ex2) {
-//                        JOptionPane.showMessageDialog(this,
-//                                "Error launching 3D Simulator:\n" + ex2.getMessage(),
-//                                "Launch Error", JOptionPane.ERROR_MESSAGE);
-//                    }
-//                });
-//            } finally {
-//                SwingUtilities.invokeLater(() -> setCursor(Cursor.getDefaultCursor()));
-//            }
-//        }).start();
-//    }
-    /**
-     * Launches the terminal-based test suite in a new console window.
-     */
-    private void launchTerminalTests() {
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        new Thread(() -> {
-            try {
-                String os = System.getProperty("os.name").toLowerCase();
-
-                // Get java executable path (handle spaces)
-                String javaHome = System.getProperty("java.home");
-                String javaBin = javaHome + java.io.File.separator + "bin" + java.io.File.separator + "java";
-
-                // Get JAR/classpath location (handle URI encoding and spaces)
-                java.io.File jarFile = new java.io.File(
-                        JazariLauncher.class.getProtectionDomain()
-                                .getCodeSource().getLocation().toURI());
-                String jarPath = jarFile.getAbsolutePath();
-
-                ProcessBuilder pb;
-                if (os.contains("win")) {
-                    // Windows: write a temp batch file to avoid quoting hell
-                    java.io.File bat = java.io.File.createTempFile("jazari_run_", ".bat");
-                    bat.deleteOnExit();
-                    try (java.io.PrintWriter pw = new java.io.PrintWriter(bat)) {
-                        pw.println("@echo off");
-                        pw.println("title JazariFresnelSim - Test Suite");
-                        pw.println("\"" + javaBin + "\" -cp \"" + jarPath + "\" jazarifresnelsim.optimization.TestOptimization");
-                        pw.println("pause");
-                    }
-                    pb = new ProcessBuilder("cmd", "/c", "start", bat.getAbsolutePath());
-                } else if (os.contains("mac")) {
-                    // macOS: open Terminal.app
-                    String cmd = "'" + javaBin + "' -cp '" + jarPath + "' jazarifresnelsim.optimization.TestOptimization";
-                    pb = new ProcessBuilder("osascript", "-e",
-                            "tell application \"Terminal\" to do script \"" + cmd + "\"");
-                } else {
-                    // Linux: try common terminal emulators
-                    String cmd = "'" + javaBin + "' -cp '" + jarPath + "' jazarifresnelsim.optimization.TestOptimization; read -p 'Press Enter to close...'";
-                    pb = new ProcessBuilder("bash", "-c",
-                            "x-terminal-emulator -e bash -c \"" + cmd + "\" 2>/dev/null || "
-                            + "gnome-terminal -- bash -c \"" + cmd + "\" 2>/dev/null || "
-                            + "xterm -e bash -c \"" + cmd + "\" 2>/dev/null");
-                }
-
-                pb.start();
-
-            } catch (Exception ex) {
-                // Fallback: run in embedded console dialog
-                SwingUtilities.invokeLater(() -> {
-                    int choice = JOptionPane.showConfirmDialog(this,
-                            "Could not open external terminal.\nRun tests in this window instead?",
-                            "Terminal Not Found", JOptionPane.YES_NO_OPTION);
-                    if (choice == JOptionPane.YES_OPTION) {
-                        runTestsEmbedded();
-                    }
-                });
-            } finally {
-                SwingUtilities.invokeLater(() -> setCursor(Cursor.getDefaultCursor()));
-            }
-        }).start();
-    }
-
-    /**
-     * Fallback: runs TestOptimization.main() directly in the current JVM.
-     * Output goes to System.out (visible in the console that launched the JAR).
-     */
-    private void runTestsEmbedded() {
-        new Thread(() -> {
-            try {
-                System.out.println("\n=== Running TestOptimization in embedded mode ===\n");
-                jazarifresnelsim.optimization.TestOptimization.main(new String[]{});
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }).start();
-    }
-
     /**
      * Main entry point for the JAR file.
      */
     public static void main(String[] args) {
-        // Check for CLI mode flag
-        if (args.length > 0 && (args[0].equals("--cli") || args[0].equals("--terminal"))) {
-            jazarifresnelsim.optimization.TestOptimization.main(new String[]{});
-            return;
-        }
-
-        // Set system look and feel for native appearance
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {
-        }
-
-        // Enable font anti-aliasing
+        // FlatLaf kurulumu - UI oluşmadan önce çağrılmalı
+        FlatDarkLaf.setup();
+        
+        // Font anti-aliasing
         System.setProperty("awt.useSystemAAFontSettings", "on");
         System.setProperty("swing.aatext", "true");
 

@@ -1,322 +1,207 @@
 package jazarifresnelsim.optimization.algorithms;
 
-import jazarifresnelsim.optimization.problem.FresnelDesignProblem;
 import jazarifresnelsim.optimization.problem.DesignParameters;
 import jazarifresnelsim.optimization.problem.DesignSolution;
+import jazarifresnelsim.optimization.problem.FresnelDesignProblem;
 
 import java.util.*;
 
+/**
+ * Particle Swarm Optimization for LFR optical design.
+ *
+ * Search space (4 variables — velocity vector size 4):
+ *   [0] H_r — receiver height [cm]
+ *   [1] w   — mirror width    [cm]
+ *   [2] p   — mirror spacing  [cm]
+ *   [3] N   — mirror count    (discrete, treated as continuous then rounded)
+ *
+ * D_r is fixed; see DesignParameters for rationale.
+ * Hyperparameters match Table 13 of the manuscript.
+ *
+ * @author Yunus Demirtas, Musa Atas — Siirt University
+ * @version 4.2
+ */
 public class ParticleSwarm implements IOptimizationAlgorithm {
 
-    // PSO parameters
-    private int swarmSize = 30;
-    private int maxIterations = 100;
-    private double inertiaWeight = 0.729; // Clerc's constriction coefficient
-    private double cognitiveWeight = 1.49445; // Personal best weight
-    private double socialWeight = 1.49445;   // Global best weight
+    // Hyperparameters — Table 13 (Clerc's constriction coefficients)
+    private int    swarmSize      = 30;
+    private int    maxIterations  = 100;
+    private double inertiaWeight  = 0.729;
+    private double cognitiveWeight= 1.49445;
+    private double socialWeight   = 1.49445;
 
-    @Override
-    public IOptimizationAlgorithm clone() {
-        try {
-            return (IOptimizationAlgorithm) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public Map<String, Object> getParameters() {
-        Map<String, Object> params = new HashMap<>();
-        params.put("swarmSize", swarmSize);
-        params.put("maxIterations", maxIterations);
-        params.put("inertiaWeight", inertiaWeight);
-        params.put("cognitiveWeight", cognitiveWeight);
-        params.put("socialWeight", socialWeight);
-        return params;
-    }
-
-    private class Particle {
-
-        DesignParameters position;
-        DesignParameters personalBest;
-        double[] velocity;
-        double fitness;
-        double personalBestFitness;
-
-        Particle(DesignParameters position, double[] velocity) {
-            this.position = position;
-            this.velocity = velocity;
-            this.personalBest = position;
-            this.fitness = Double.NEGATIVE_INFINITY;
-            this.personalBestFitness = Double.NEGATIVE_INFINITY;
-        }
-    }
+    private static final int DIM = 4;  // H_r, w, p, N
 
     private List<DesignSolution> history;
-    private Random random;
-    private int currentIteration;
-    private List<Particle> swarm;
-    private DesignParameters globalBest;
-    private double globalBestFitness;
+    private Random               random;
+    private int                  currentIteration;
+    private List<Particle>       swarm;
+    private DesignParameters     globalBest;
+    private double               globalBestFitness;
 
     public ParticleSwarm() {
-        this.random = new Random();
+        this.random  = new Random();
         this.history = new ArrayList<>();
         reset();
     }
 
+    // ================================================================
+    // PARTICLE
+    // ================================================================
+    private class Particle {
+        DesignParameters position;
+        DesignParameters personalBest;
+        double[]         velocity = new double[DIM];
+        double           fitness             = Double.NEGATIVE_INFINITY;
+        double           personalBestFitness = Double.NEGATIVE_INFINITY;
+
+        Particle(DesignParameters pos) {
+            this.position     = pos;
+            this.personalBest = pos;
+            // Random initial velocity — 10 % of range
+            velocity[0] = rndVel(DesignParameters.MAX_RECEIVER_HEIGHT - DesignParameters.MIN_RECEIVER_HEIGHT);
+            velocity[1] = rndVel(DesignParameters.MAX_MIRROR_WIDTH    - DesignParameters.MIN_MIRROR_WIDTH);
+            velocity[2] = rndVel(DesignParameters.MAX_MIRROR_SPACING  - DesignParameters.MIN_MIRROR_SPACING);
+            velocity[3] = rndVel(DesignParameters.MAX_NUMBER_OF_MIRRORS - DesignParameters.MIN_NUMBER_OF_MIRRORS);
+        }
+        private double rndVel(double range) { return (random.nextDouble() - 0.5) * range * 0.1; }
+    }
+
+    // ================================================================
+    // MAIN LOOP
+    // ================================================================
     @Override
     public DesignSolution optimize(FresnelDesignProblem problem,
-            DesignParameters initialParams,
-            Map<String, Object> constraints) {
-        initializeSwarm(initialParams);
+                                   DesignParameters     initialParams,
+                                   Map<String, Object>  constraints) {
+        initSwarm(initialParams);
 
         while (!isTerminationCriteriaMet()) {
-            // Evaluate current swarm
-            for (Particle particle : swarm) {
-                particle.fitness = problem.evaluateDesign(particle.position);
-
-                // Update personal best
-                if (particle.fitness > particle.personalBestFitness) {
-                    particle.personalBest = particle.position;
-                    particle.personalBestFitness = particle.fitness;
-
-                    // Update global best
-                    if (particle.fitness > globalBestFitness) {
-                        globalBest = particle.position;
-                        globalBestFitness = particle.fitness;
+            for (Particle p : swarm) {
+                p.fitness = problem.evaluateDesign(p.position);
+                if (p.fitness > p.personalBestFitness) {
+                    p.personalBest        = p.position;
+                    p.personalBestFitness = p.fitness;
+                    if (p.fitness > globalBestFitness) {
+                        globalBest        = p.position;
+                        globalBestFitness = p.fitness;
                     }
                 }
             }
-
-            // Update particle velocities and positions
             updateSwarm();
-
-            // Record history
             history.add(new DesignSolution(globalBest, globalBestFitness));
             currentIteration++;
         }
-
         return new DesignSolution(globalBest, globalBestFitness);
     }
 
-    private void initializeSwarm(DesignParameters initial) {
+    // ================================================================
+    // SWARM OPERATIONS
+    // ================================================================
+    private void initSwarm(DesignParameters initial) {
         swarm = new ArrayList<>();
         globalBestFitness = Double.NEGATIVE_INFINITY;
-
-        // Initialize each particle
-        for (int i = 0; i < swarmSize; i++) {
-            // Generate random position around initial solution
-            DesignParameters position = generateRandomPosition(initial);
-            double[] velocity = generateRandomVelocity();
-
-            swarm.add(new Particle(position, velocity));
-        }
-    }
-
-    private DesignParameters generateRandomPosition(DesignParameters base) {
-        // Generate random position with Gaussian perturbation around base
-        double receiverHeight = generateRandomParameter(
-                DesignParameters.MIN_RECEIVER_HEIGHT,
-                DesignParameters.MAX_RECEIVER_HEIGHT);
-        double receiverDiameter = generateRandomParameter(
-                DesignParameters.MIN_RECEIVER_DIAMETER,
-                DesignParameters.MAX_RECEIVER_DIAMETER);
-        double mirrorWidth = generateRandomParameter(
-                DesignParameters.MIN_MIRROR_WIDTH,
-                DesignParameters.MAX_MIRROR_WIDTH);
-//        double mirrorLength = generateRandomParameter(
-//                DesignParameters.MIN_MIRROR_LENGTH,
-//                DesignParameters.MAX_MIRROR_LENGTH);
-        double mirrorSpacing = generateRandomParameter(
-                DesignParameters.MIN_MIRROR_SPACING,
-                DesignParameters.MAX_MIRROR_SPACING);
-        int numberOfMirrors = random.nextInt(
-                DesignParameters.MAX_NUMBER_OF_MIRRORS
-                - DesignParameters.MIN_NUMBER_OF_MIRRORS + 1)
-                + DesignParameters.MIN_NUMBER_OF_MIRRORS;
-
-        return new DesignParameters(
-                receiverHeight, 
-                receiverDiameter,
-                mirrorWidth, 
-                //mirrorLength,
-                mirrorSpacing, 
-                numberOfMirrors);
-    }
-
-    private double generateRandomParameter(double min, double max) {
-        return min + random.nextDouble() * (max - min);
-    }
-
-    private double[] generateRandomVelocity() {
-        // Initialize velocities as fraction of parameter ranges
-        double[] velocity = new double[5];
-        velocity[0] = (random.nextDouble() - 0.5)
-                * (DesignParameters.MAX_RECEIVER_HEIGHT - DesignParameters.MIN_RECEIVER_HEIGHT) * 0.1;
-        velocity[1] = (random.nextDouble() - 0.5)
-                * (DesignParameters.MAX_RECEIVER_DIAMETER - DesignParameters.MIN_RECEIVER_DIAMETER) * 0.1;
-        velocity[2] = (random.nextDouble() - 0.5)
-                * (DesignParameters.MAX_MIRROR_WIDTH - DesignParameters.MIN_MIRROR_WIDTH) * 0.1;
-//        velocity[3] = (random.nextDouble() - 0.5)
-//                * (DesignParameters.MAX_MIRROR_LENGTH - DesignParameters.MIN_MIRROR_LENGTH) * 0.1;
-        velocity[3] = (random.nextDouble() - 0.5)
-                * (DesignParameters.MAX_MIRROR_SPACING - DesignParameters.MIN_MIRROR_SPACING) * 0.1;
-        velocity[4] = (random.nextDouble() - 0.5) * 2; // For discrete number of mirrors
-
-        return velocity;
+        for (int i = 0; i < swarmSize; i++)
+            swarm.add(new Particle(randomParams()));
     }
 
     private void updateSwarm() {
-        for (Particle particle : swarm) {
-            // Update velocity
-            for (int i = 0; i < particle.velocity.length; i++) {
+        for (Particle p : swarm) {
+            double[] cur  = toArray(p.position);
+            double[] pb   = toArray(p.personalBest);
+            double[] gb   = toArray(globalBest);
+
+            for (int i = 0; i < DIM; i++) {
                 double r1 = random.nextDouble();
                 double r2 = random.nextDouble();
-
-                // Get current parameter values
-                double currentPos = getParameterValue(particle.position, i);
-                double personalBestPos = getParameterValue(particle.personalBest, i);
-                double globalBestPos = getParameterValue(globalBest, i);
-
-                // Update velocity using standard PSO formula
-                particle.velocity[i] = inertiaWeight * particle.velocity[i]
-                        + cognitiveWeight * r1 * (personalBestPos - currentPos)
-                        + socialWeight * r2 * (globalBestPos - currentPos);
-
-                // Apply velocity clamping
-                particle.velocity[i] = clampVelocity(particle.velocity[i], i);
+                p.velocity[i] = inertiaWeight   * p.velocity[i]
+                              + cognitiveWeight  * r1 * (pb[i] - cur[i])
+                              + socialWeight     * r2 * (gb[i] - cur[i]);
+                p.velocity[i] = clampVel(p.velocity[i], i);
             }
-
-            // Update position
-            particle.position = updatePosition(particle.position, particle.velocity);
+            p.position = fromArray(cur, p.velocity);
         }
     }
 
-    private double getParameterValue(DesignParameters params, int index) {
-        return switch (index) {
-            case 0 ->
-                params.getReceiverHeight();
-            case 1 ->
-                params.getReceiverDiameter();
-            case 2 ->
-                params.getMirrorWidth();
-//            case 3 ->
-//                params.getMirrorLength();
-            case 3 ->
-                params.getMirrorSpacing();
-            case 4 ->
-                params.getNumberOfMirrors();
-            default ->
-                throw new IllegalArgumentException("Invalid parameter index");
+    // ================================================================
+    // CONVERSION HELPERS — 4-element array ↔ DesignParameters
+    // ================================================================
+    private double[] toArray(DesignParameters p) {
+        return new double[]{
+            p.getReceiverHeight(),
+            p.getMirrorWidth(),
+            p.getMirrorSpacing(),
+            p.getNumberOfMirrors()
         };
     }
 
-    private double clampVelocity(double velocity, int paramIndex) {
-        double maxVelocity = switch (paramIndex) {
-            case 0 ->
-                (DesignParameters.MAX_RECEIVER_HEIGHT - DesignParameters.MIN_RECEIVER_HEIGHT) * 0.1;
-            case 1 ->
-                (DesignParameters.MAX_RECEIVER_DIAMETER - DesignParameters.MIN_RECEIVER_DIAMETER) * 0.1;
-            case 2 ->
-                (DesignParameters.MAX_MIRROR_WIDTH - DesignParameters.MIN_MIRROR_WIDTH) * 0.1;
-//            case 3 ->
-//                (DesignParameters.MAX_MIRROR_LENGTH - DesignParameters.MIN_MIRROR_LENGTH) * 0.1;
-            case 3 ->
-                (DesignParameters.MAX_MIRROR_SPACING - DesignParameters.MIN_MIRROR_SPACING) * 0.1;
-            case 4 ->
-                2.0; // For discrete number of mirrors
-            default ->
-                throw new IllegalArgumentException("Invalid parameter index");
-        };
-
-        return Math.max(-maxVelocity, Math.min(maxVelocity, velocity));
+    private DesignParameters fromArray(double[] cur, double[] vel) {
+        double Hr = clamp(cur[0] + vel[0],
+                DesignParameters.MIN_RECEIVER_HEIGHT,  DesignParameters.MAX_RECEIVER_HEIGHT);
+        double w  = clamp(cur[1] + vel[1],
+                DesignParameters.MIN_MIRROR_WIDTH,     DesignParameters.MAX_MIRROR_WIDTH);
+        double p  = clamp(cur[2] + vel[2],
+                DesignParameters.MIN_MIRROR_SPACING,   DesignParameters.MAX_MIRROR_SPACING);
+        int    N  = (int) clamp(cur[3] + vel[3],
+                DesignParameters.MIN_NUMBER_OF_MIRRORS, DesignParameters.MAX_NUMBER_OF_MIRRORS);
+        return new DesignParameters(Hr, w, p, N);
     }
 
-    private DesignParameters updatePosition(DesignParameters current, double[] velocity) {
-        double newReceiverHeight = clampParameter(
-                current.getReceiverHeight() + velocity[0],
-                DesignParameters.MIN_RECEIVER_HEIGHT,
-                DesignParameters.MAX_RECEIVER_HEIGHT);
+    private double clampVel(double v, int idx) {
+        double max = switch (idx) {
+            case 0 -> (DesignParameters.MAX_RECEIVER_HEIGHT - DesignParameters.MIN_RECEIVER_HEIGHT) * 0.1;
+            case 1 -> (DesignParameters.MAX_MIRROR_WIDTH    - DesignParameters.MIN_MIRROR_WIDTH)    * 0.1;
+            case 2 -> (DesignParameters.MAX_MIRROR_SPACING  - DesignParameters.MIN_MIRROR_SPACING)  * 0.1;
+            case 3 -> 2.0;
+            default -> throw new IllegalArgumentException("Invalid index " + idx);
+        };
+        return Math.max(-max, Math.min(max, v));
+    }
 
-        double newReceiverDiameter = clampParameter(
-                current.getReceiverDiameter() + velocity[1],
-                DesignParameters.MIN_RECEIVER_DIAMETER,
-                DesignParameters.MAX_RECEIVER_DIAMETER);
-
-        double newMirrorWidth = clampParameter(
-                current.getMirrorWidth() + velocity[2],
-                DesignParameters.MIN_MIRROR_WIDTH,
-                DesignParameters.MAX_MIRROR_WIDTH);
-
-//        double newMirrorLength = clampParameter(
-//                current.getMirrorLength() + velocity[3],
-//                DesignParameters.MIN_MIRROR_LENGTH,
-//                DesignParameters.MAX_MIRROR_LENGTH);
-
-        double newMirrorSpacing = clampParameter(
-                current.getMirrorSpacing() + velocity[3],
-                DesignParameters.MIN_MIRROR_SPACING,
-                DesignParameters.MAX_MIRROR_SPACING);
-
-        int newNumberOfMirrors = (int) clampParameter(
-                current.getNumberOfMirrors() + velocity[4],
-                DesignParameters.MIN_NUMBER_OF_MIRRORS,
-                DesignParameters.MAX_NUMBER_OF_MIRRORS);
-
+    private DesignParameters randomParams() {
         return new DesignParameters(
-                newReceiverHeight, 
-                newReceiverDiameter,
-                newMirrorWidth, 
-                //newMirrorLength,
-                newMirrorSpacing, 
-                newNumberOfMirrors);
+                rnd(DesignParameters.MIN_RECEIVER_HEIGHT,  DesignParameters.MAX_RECEIVER_HEIGHT),
+                rnd(DesignParameters.MIN_MIRROR_WIDTH,     DesignParameters.MAX_MIRROR_WIDTH),
+                rnd(DesignParameters.MIN_MIRROR_SPACING,   DesignParameters.MAX_MIRROR_SPACING),
+                random.nextInt(DesignParameters.MAX_NUMBER_OF_MIRRORS
+                             - DesignParameters.MIN_NUMBER_OF_MIRRORS + 1)
+                             + DesignParameters.MIN_NUMBER_OF_MIRRORS);
     }
 
-    private double clampParameter(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
+    private double rnd(double min, double max)         { return min + random.nextDouble() * (max - min); }
+    private double clamp(double v, double min, double max) { return Math.max(min, Math.min(max, v)); }
 
-    @Override
-    public void setParameters(Map<String, Object> parameters) {
-        if (parameters.containsKey("swarmSize")) {
-            this.swarmSize = (int) parameters.get("swarmSize");
-        }
-        if (parameters.containsKey("maxIterations")) {
-            this.maxIterations = (int) parameters.get("maxIterations");
-        }
-        if (parameters.containsKey("inertiaWeight")) {
-            this.inertiaWeight = (double) parameters.get("inertiaWeight");
-        }
-        if (parameters.containsKey("cognitiveWeight")) {
-            this.cognitiveWeight = (double) parameters.get("cognitiveWeight");
-        }
-        if (parameters.containsKey("socialWeight")) {
-            this.socialWeight = (double) parameters.get("socialWeight");
-        }
+    // ================================================================
+    // INTERFACE
+    // ================================================================
+    @Override public void setParameters(Map<String, Object> p) {
+        if (p.containsKey("swarmSize"))       swarmSize       = (int)    p.get("swarmSize");
+        if (p.containsKey("maxIterations"))   maxIterations   = (int)    p.get("maxIterations");
+        if (p.containsKey("inertiaWeight"))   inertiaWeight   = (double) p.get("inertiaWeight");
+        if (p.containsKey("cognitiveWeight")) cognitiveWeight = (double) p.get("cognitiveWeight");
+        if (p.containsKey("socialWeight"))    socialWeight    = (double) p.get("socialWeight");
     }
-
-    @Override
-    public List<DesignSolution> getHistory() {
-        return new ArrayList<>(history);
+    @Override public Map<String, Object> getParameters() {
+        Map<String, Object> p = new HashMap<>();
+        p.put("swarmSize",       swarmSize);
+        p.put("maxIterations",   maxIterations);
+        p.put("inertiaWeight",   inertiaWeight);
+        p.put("cognitiveWeight", cognitiveWeight);
+        p.put("socialWeight",    socialWeight);
+        return p;
     }
-
-    @Override
-    public boolean isTerminationCriteriaMet() {
-        return currentIteration >= maxIterations;
+    @Override public List<DesignSolution>    getHistory()               { return new ArrayList<>(history); }
+    @Override public boolean                 isTerminationCriteriaMet() { return currentIteration >= maxIterations; }
+    @Override public void reset() {
+        currentIteration  = 0;
+        swarm             = new ArrayList<>();
+        globalBest        = null;
+        globalBestFitness = Double.NEGATIVE_INFINITY;
+        history.clear();
     }
-
-    @Override
-    public void reset() {
-        this.currentIteration = 0;
-        this.swarm = new ArrayList<>();
-        this.globalBest = null;
-        this.globalBestFitness = Double.NEGATIVE_INFINITY;
-        this.history.clear();
-    }
-
-    @Override
-    public String getAlgorithmName() {
-        return "Particle Swarm Optimization";
+    @Override public String getAlgorithmName() { return "Particle Swarm Optimization"; }
+    @Override public IOptimizationAlgorithm clone() {
+        try { return (IOptimizationAlgorithm) super.clone(); }
+        catch (CloneNotSupportedException e) { throw new RuntimeException(e); }
     }
 }

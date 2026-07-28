@@ -2,221 +2,152 @@ package jazarifresnelsim.optimization.algorithms;
 
 import jazarifresnelsim.optimization.problem.DesignParameters;
 import jazarifresnelsim.optimization.problem.DesignSolution;
-import java.util.*;
 import jazarifresnelsim.optimization.problem.FresnelDesignProblem;
 
+import java.util.*;
+
+/**
+ * Simulated Annealing for LFR optical design optimization.
+ *
+ * Search space (4 variables):
+ *   H_r — receiver height [cm]
+ *   w   — mirror width    [cm]
+ *   p   — mirror spacing  [cm]
+ *   N   — mirror count    (discrete ± 1 per step)
+ *
+ * D_r is fixed; see DesignParameters for rationale.
+ * Hyperparameters match Table 13 of the manuscript.
+ *
+ * @author Yunus Demirtas, Musa Atas — Siirt University
+ * @version 4.2
+ */
 public class SimulatedAnnealing implements IOptimizationAlgorithm {
 
-    // Güncellenen parametreler
+    // Hyperparameters — Table 13
     private double initialTemperature = 1000.0;
-    private double coolingRate = 0.995;    // Daha yavaş soğuma
-    private int maxIterations = 50000;     // Daha fazla iterasyon
-    private double minTemperature = 1e-8;  // Daha düşük minimum sıcaklık
+    private double coolingRate        = 0.95;
+    private int    maxIterations      = 1000;
+    private double minTemperature     = 1e-8;
 
-    // Yeni eklenen parametreler
-    private static final double ADAPTIVE_RATE = 0.001;  // Adaptif soğuma için
-    private static final double MAX_PERTURBATION = 0.1; // Maximum değişim oranı (%10)
-    private static final double CHANGE_PROBABILITY = 0.5; // Parametre değişim olasılığı
+    // Perturbation constants
+    private static final double MAX_PERTURBATION    = 0.10;  // 10 % Gaussian step
+    private static final double CHANGE_PROBABILITY  = 0.50;  // per-parameter mutation prob.
 
     private List<DesignSolution> history;
-    private Random random;
-    private int currentIteration;
-    private double currentTemperature;
+    private Random               random;
+    private int                  currentIteration;
+    private double               currentTemperature;
 
     public SimulatedAnnealing() {
-        this.random = new Random();
+        this.random  = new Random();
         this.history = new ArrayList<>();
         reset();
     }
 
+    // ================================================================
+    // MAIN LOOP
+    // ================================================================
     @Override
     public DesignSolution optimize(FresnelDesignProblem problem,
-            DesignParameters initialParams,
-            Map<String, Object> constraints) {
-        DesignParameters currentSolution = initialParams;
-        double currentEnergy = problem.evaluateDesign(currentSolution);
-
-        DesignParameters bestSolution = currentSolution;
-        double bestEnergy = currentEnergy;
-
-        int noImprovementCount = 0;
-        double adaptiveCoolingRate = coolingRate;
+                                   DesignParameters     initialParams,
+                                   Map<String, Object>  constraints) {
+        DesignParameters current      = initialParams;
+        double           currentEnergy= problem.evaluateDesign(current);
+        DesignParameters best         = current;
+        double           bestEnergy   = currentEnergy;
 
         while (!isTerminationCriteriaMet()) {
-            // Adaptif soğuma oranı güncelleme
-            if (noImprovementCount > 1000) {
-                adaptiveCoolingRate = Math.pow(coolingRate, 1.0 + ADAPTIVE_RATE * noImprovementCount);
-            }
+            DesignParameters neighbor     = neighbor(current);
+            double           neighborE    = problem.evaluateDesign(neighbor);
 
-            // Yeni çözüm üret
-            DesignParameters newSolution = generateNeighbor(currentSolution);
-            double newEnergy = problem.evaluateDesign(newSolution);
-
-            // Kabul olasılığı hesapla
-            if (acceptSolution(currentEnergy, newEnergy, currentTemperature)) {
-                currentSolution = newSolution;
-                currentEnergy = newEnergy;
-
-                // En iyi çözümü güncelle
-                if (newEnergy > bestEnergy) {
-                    bestSolution = newSolution;
-                    bestEnergy = newEnergy;
-                    noImprovementCount = 0;
-                } else {
-                    noImprovementCount++;
+            if (accept(currentEnergy, neighborE, currentTemperature)) {
+                current      = neighbor;
+                currentEnergy= neighborE;
+                if (neighborE > bestEnergy) {
+                    best       = neighbor;
+                    bestEnergy = neighborE;
                 }
-            } else {
-                noImprovementCount++;
             }
 
-            // History'ye kaydet
-            history.add(new DesignSolution(bestSolution, bestEnergy));
+            history.add(new DesignSolution(best, bestEnergy));
+            currentTemperature *= coolingRate;
 
-            // Sıcaklığı düşür
-            currentTemperature *= adaptiveCoolingRate;
-            currentIteration++;
-
-            // Periyodik yeniden ısıtma
-            if (currentTemperature < minTemperature && currentIteration < maxIterations) {
+            // Periodic reheat to escape local optima
+            if (currentTemperature < minTemperature
+                    && currentIteration < maxIterations / 2) {
                 currentTemperature = initialTemperature * 0.5;
-                noImprovementCount = 0;
             }
+            currentIteration++;
         }
-
-        return new DesignSolution(bestSolution, bestEnergy);
+        return new DesignSolution(best, bestEnergy);
     }
 
-    private boolean acceptSolution(double currentEnergy, double newEnergy, double temperature) {
-        if (newEnergy > currentEnergy) {
-            return true;
-        }
-        // Düzeltilmiş acceptance probability hesabı
-        double acceptanceProb = Math.exp(-(currentEnergy - newEnergy) / temperature);
-        return random.nextDouble() < acceptanceProb;
+    // ================================================================
+    // SA OPERATORS — 4-parameter space (no D_r)
+    // ================================================================
+    private DesignParameters neighbor(DesignParameters p) {
+        double Hr = p.getReceiverHeight();
+        double w  = p.getMirrorWidth();
+        double sp = p.getMirrorSpacing();
+        int    N  = p.getNumberOfMirrors();
+
+        if (random.nextDouble() < CHANGE_PROBABILITY)
+            Hr = clamp(Hr * (1 + random.nextGaussian() * MAX_PERTURBATION),
+                    DesignParameters.MIN_RECEIVER_HEIGHT, DesignParameters.MAX_RECEIVER_HEIGHT);
+        if (random.nextDouble() < CHANGE_PROBABILITY)
+            w  = clamp(w  * (1 + random.nextGaussian() * MAX_PERTURBATION),
+                    DesignParameters.MIN_MIRROR_WIDTH, DesignParameters.MAX_MIRROR_WIDTH);
+        if (random.nextDouble() < CHANGE_PROBABILITY)
+            sp = clamp(sp * (1 + random.nextGaussian() * MAX_PERTURBATION),
+                    DesignParameters.MIN_MIRROR_SPACING, DesignParameters.MAX_MIRROR_SPACING);
+        if (random.nextDouble() < CHANGE_PROBABILITY)
+            N  = clampI(N + (random.nextBoolean() ? 1 : -1),
+                    DesignParameters.MIN_NUMBER_OF_MIRRORS, DesignParameters.MAX_NUMBER_OF_MIRRORS);
+
+        return new DesignParameters(Hr, w, sp, N);
     }
 
-    private DesignParameters generateNeighbor(DesignParameters current) {
-        double receiverHeight = current.getReceiverHeight();
-        double receiverDiameter = current.getReceiverDiameter();
-        double mirrorWidth = current.getMirrorWidth();
-        double mirrorSpacing = current.getMirrorSpacing();
-        int numberOfMirrors = current.getNumberOfMirrors();
-
-        // Her parametre için kontrollü değişim
-        if (random.nextDouble() < CHANGE_PROBABILITY) {
-            double perturbation = (random.nextGaussian() * MAX_PERTURBATION);
-            receiverHeight = clamp(
-                    receiverHeight * (1 + perturbation),
-                    DesignParameters.MIN_RECEIVER_HEIGHT,
-                    DesignParameters.MAX_RECEIVER_HEIGHT
-            );
-        }
-
-        if (random.nextDouble() < CHANGE_PROBABILITY) {
-            double perturbation = (random.nextGaussian() * MAX_PERTURBATION);
-            receiverDiameter = clamp(
-                    receiverDiameter * (1 + perturbation),
-                    DesignParameters.MIN_RECEIVER_DIAMETER,
-                    DesignParameters.MAX_RECEIVER_DIAMETER
-            );
-        }
-
-        if (random.nextDouble() < CHANGE_PROBABILITY) {
-            double perturbation = (random.nextGaussian() * MAX_PERTURBATION);
-            mirrorWidth = clamp(
-                    mirrorWidth * (1 + perturbation),
-                    DesignParameters.MIN_MIRROR_WIDTH,
-                    DesignParameters.MAX_MIRROR_WIDTH
-            );
-        }
-
-        if (random.nextDouble() < CHANGE_PROBABILITY) {
-            double perturbation = (random.nextGaussian() * MAX_PERTURBATION);
-            mirrorSpacing = clamp(
-                    mirrorSpacing * (1 + perturbation),
-                    DesignParameters.MIN_MIRROR_SPACING,
-                    DesignParameters.MAX_MIRROR_SPACING
-            );
-        }
-
-        if (random.nextDouble() < CHANGE_PROBABILITY) {
-            // Ayna sayısı için daha kontrollü değişim
-            int step = random.nextBoolean() ? 1 : -1;
-            numberOfMirrors = (int) clamp(
-                    numberOfMirrors + step,
-                    DesignParameters.MIN_NUMBER_OF_MIRRORS,
-                    DesignParameters.MAX_NUMBER_OF_MIRRORS
-            );
-        }
-
-        return new DesignParameters(
-                receiverHeight,
-                receiverDiameter,
-                mirrorWidth,
-                mirrorSpacing,
-                numberOfMirrors
-        );
+    private boolean accept(double current, double next, double temp) {
+        if (next > current) return true;
+        return random.nextDouble() < Math.exp(-(current - next) / temp);
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
+    // ================================================================
+    // UTILITY
+    // ================================================================
+    private double clamp(double v, double min, double max) { return Math.max(min, Math.min(max, v)); }
+    private int    clampI(int v, int min, int max)         { return Math.max(min, Math.min(max, v)); }
 
-    @Override
-    public void setParameters(Map<String, Object> parameters) {
-        if (parameters.containsKey("initialTemperature")) {
-            this.initialTemperature = (double) parameters.get("initialTemperature");
-        }
-        if (parameters.containsKey("coolingRate")) {
-            this.coolingRate = (double) parameters.get("coolingRate");
-        }
-        if (parameters.containsKey("maxIterations")) {
-            this.maxIterations = (int) parameters.get("maxIterations");
-        }
-        if (parameters.containsKey("minTemperature")) {
-            this.minTemperature = (double) parameters.get("minTemperature");
-        }
+    // ================================================================
+    // INTERFACE
+    // ================================================================
+    @Override public void setParameters(Map<String, Object> p) {
+        if (p.containsKey("initialTemperature")) initialTemperature = (double) p.get("initialTemperature");
+        if (p.containsKey("coolingRate"))        coolingRate        = (double) p.get("coolingRate");
+        if (p.containsKey("maxIterations"))      maxIterations      = (int)    p.get("maxIterations");
+        if (p.containsKey("minTemperature"))     minTemperature     = (double) p.get("minTemperature");
     }
-
-    @Override
-    public List<DesignSolution> getHistory() {
-        return new ArrayList<>(history);
+    @Override public Map<String, Object> getParameters() {
+        Map<String, Object> p = new HashMap<>();
+        p.put("initialTemperature", initialTemperature);
+        p.put("coolingRate",        coolingRate);
+        p.put("maxIterations",      maxIterations);
+        p.put("minTemperature",     minTemperature);
+        return p;
     }
-
-    @Override
-    public boolean isTerminationCriteriaMet() {
-        return currentIteration >= maxIterations || 
-               (currentTemperature < minTemperature && currentIteration > maxIterations/2);
+    @Override public List<DesignSolution>    getHistory()               { return new ArrayList<>(history); }
+    @Override public boolean                 isTerminationCriteriaMet() {
+        return currentIteration >= maxIterations
+            || (currentTemperature < minTemperature && currentIteration > maxIterations / 2);
     }
-
-    @Override
-    public void reset() {
-        this.currentIteration = 0;
-        this.currentTemperature = initialTemperature;
-        this.history.clear();
+    @Override public void reset() {
+        currentIteration   = 0;
+        currentTemperature = initialTemperature;
+        history.clear();
     }
-
-    @Override
-    public String getAlgorithmName() {
-        return "Simulated Annealing";
-    }
-
-    @Override
-    public IOptimizationAlgorithm clone() {
-        try {
-            return (IOptimizationAlgorithm) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public Map<String, Object> getParameters() {
-        Map<String, Object> params = new HashMap<>();
-        params.put("initialTemperature", initialTemperature);
-        params.put("coolingRate", coolingRate);
-        params.put("maxIterations", maxIterations);
-        params.put("minTemperature", minTemperature);
-        return params;
+    @Override public String getAlgorithmName() { return "Simulated Annealing"; }
+    @Override public IOptimizationAlgorithm clone() {
+        try { return (IOptimizationAlgorithm) super.clone(); }
+        catch (CloneNotSupportedException e) { throw new RuntimeException(e); }
     }
 }
