@@ -151,7 +151,10 @@ public class DesignFresnelSystemFrame extends JFrame {
             {"Test 8 · Convergence Export", "Fig. 9  (CSV data)", 8},
             {"Test 9 · SolTrace Ranking", "WITHDRAWN — circular metric", 9},
             {"Test 10 · G1–G5 vs SolTrace", "MCRT validation  ρ=1.000", 10},
-            {"Test 11 · Solar Position", "vs NREL SPA (pvlib)", 11},};
+            {"Test 11 · Solar Position", "vs NREL SPA (pvlib)", 11},
+            {"Test 12 · Tracking Solver", "Reflection-law residual", 12},
+            { "Test 13 · Well-posedness", "Fig. 5 · J(N), two modes", 13 },
+        };
 
         for (Object[] d : defs) {
             grid.add(makeBtn((String) d[0], (String) d[1], (Integer) d[2], false));

@@ -11,7 +11,8 @@ import jazarifresnelsim.models.SolarPosition;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.*;
-import java.util.stream.DoubleStream;
+import jazarifresnelsim.domain.MirrorTracker;
+import jazarifresnelsim.models.SimulationState;
 
 /**
  * Validation and optimization test suite for JazariFresnelSim.
@@ -59,10 +60,12 @@ public class TestOptimization {
         ConfigManager.setProperty("mirror_length_cm", String.valueOf(FIX_L_CM));
         ConfigManager.setProperty("receiver_diameter_cm", String.valueOf(FIX_DR_CM));
         ConfigManager.setProperty("num_mirrors", String.valueOf(FIX_N));
+        ConfigManager.setProperty("min_rec_height", "50.0");   // TANI: sinir bagliyici mi?
         Constants.updateFromConfig();
         DesignParameters.updateBoundsFromConfig();
-        System.out.printf("[FIXTURE] w=%.0f p=%.0f Hr=%.0f L=%.0f Dr=%.0f N=%d%n",
-                FIX_W_CM, FIX_P_CM, FIX_HR_CM, FIX_L_CM, FIX_DR_CM, FIX_N);
+        System.out.printf("[FIXTURE] w=%.0f p=%.0f Hr=%.0f L=%.0f Dr=%.0f N=%d | min_Hr=%.0f%n",
+                FIX_W_CM, FIX_P_CM, FIX_HR_CM, FIX_L_CM, FIX_DR_CM, FIX_N,
+                DesignParameters.MIN_RECEIVER_HEIGHT);
     }
 
     // ================================================================
@@ -101,6 +104,10 @@ public class TestOptimization {
                 runTable6();
             case 11 ->
                 runSolarPositionVerification();
+            case 12 ->
+                runTrackingVerification();
+            case 13 ->
+                runWellPosednessSweep();
             case 0 ->
                 runAllTests();
             default ->
@@ -349,7 +356,8 @@ public class TestOptimization {
         final double ALT_FLOOR = 5.0;    // ignore alpha < 5 deg
 
         double[] pwRatios = {1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,
-            1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0};
+            1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0,
+            3.2, 3.4, 3.6, 3.8, 4.0};
 
         String[] siteNames = {"Diyarbakir", "Berlin", "Jeddah"};
         double[][] siteCoords = {
@@ -363,6 +371,8 @@ public class TestOptimization {
 
         System.out.printf("Fixed: N=%d, w=%.0f cm, Hr=%.0f cm, L=%.0f cm | dt=%.2f h | alpha>%.0f deg%n%n",
                 N, w, Hr, L, DT_HOURS, ALT_FLOOR);
+        System.out.printf("Sweep: %d points, p/w from %.1f to %.1f%n%n",
+                pwRatios.length, pwRatios[0], pwRatios[pwRatios.length - 1]);
         System.out.printf("%-12s %-8s %10s %12s %12s %8s %8s %8s%n",
                 "Site", "Date", "opt p/w", "opt p/w", "E@opt", "E1.5", "E2.0", "E3.0");
         System.out.printf("%-12s %-8s %10s %12s %12s %8s %8s %8s%n",
@@ -536,9 +546,11 @@ public class TestOptimization {
 
         int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
 
-        final double R_LO = 0.20;   // Hr/Wf sweep start
         final double R_HI = 3.00;   // Hr/Wf sweep end
-        final int NSTEPS = 40;
+//        final double R_LO = 0.20;   // Hr/Wf sweep start
+//        final int NSTEPS = 40;
+        final double R_LO = 0.05;   // eski: 0.20
+        final int NSTEPS = 60;     // eski: 40
 
         System.out.printf("Fixed: w=%.0f cm (w/Dr=1.0), p=%.0f cm (p/w=1.5) | Hr/Wf swept %.1f..%.1f%n%n",
                 W_CM, P_CM, R_LO, R_HI);
@@ -1644,5 +1656,399 @@ public class TestOptimization {
         System.out.println("  NREL SPA apparent elevation = 74.8548 deg");
         System.out.println("  The published Figure 3 peaks near 68 deg, which is wrong by ~6.9 deg.");
         System.out.println("  Whatever this test reports is the number that belongs in the paper.");
+    }
+
+    // ============================================================================
+// NEW TEST 12 - MIRROR TRACKING VERIFICATION AGAINST THE LAW OF REFLECTION
+//
+// Add to TestOptimization.java and wire in:
+//     case 12 -> runTrackingVerification();
+// GUI:  { "Test 12 · Tracking Solver",  "Reflection-law residual", 12 },
+//
+// WHY THIS REPLACES THE BARBON COMPARISON
+// ---------------------------------------
+// The manuscript's component-level validation cited Barbon et al. (Energies
+// 2021, 14, 2883) for per-mirror tilt angles at Mieres, Spain. That paper
+// contains no per-mirror tracking angles: it derives the two LONGITUDINAL
+// tilt angles of the mobile structure (beta_M = lambda/2) and of the
+// secondary reflector system (beta_a = lambda). Its case studies are Almeria,
+// Rome, Budapest, Berlin and Helsinki - Mieres does not appear. The cited
+// quantity and the cited geometry are both absent from the reference.
+//
+// Comparing two implementations of the same closed-form bisector law would in
+// any case be circular. This test instead checks the tracking solver against
+// an INDEPENDENT physical law:
+//
+//   1. take theta_i from MirrorTracker
+//   2. build the mirror normal  n = (sin theta, 0, cos theta)
+//   3. apply the full 3-D specular reflection law  r = 2(s.n)n - s
+//   4. project r onto the transverse (x-z) plane
+//   5. compare its direction with the direction to the receiver
+//
+// A correct single-axis tracker must make the transverse projection of the
+// reflected ray point exactly at the receiver. The residual should be at
+// machine precision. Nothing in steps 2-5 reuses the tracking derivation, so
+// the test is a genuine verification rather than a restatement.
+//
+// WHAT IT CAUGHT
+// --------------
+// The previous implementation summed the 3-D unit vectors,
+//     n = s_3D + t_3D,   theta = atan2(n_x, n_z)
+// which weights the sun direction by |(s_x, s_z)| < 1 relative to the target
+// and is therefore not the bisector of the PROJECTED directions. Derivation:
+// with n = (sin theta, 0, cos theta) the reflected ray satisfies
+//     (r_x, r_z) ~ (sin(2 theta - psi_s), cos(2 theta - psi_s))
+// so aiming at the receiver requires 2 theta - psi_s = psi_t, i.e.
+//     theta = (psi_s + psi_t) / 2
+// with psi_s = atan2(s_x, s_z) the TRANSVERSE profile angle of the sun.
+// The legacy column below quantifies the error the old form would have made.
+// ============================================================================
+    public static void runTrackingVerification() {
+
+        System.out.println("=== TEST 12: Tracking Solver vs Law of Reflection ===\n");
+
+        final double ALT_FLOOR = 5.0;
+
+        String[] siteNames = {"Jeddah", "Diyarbakir", "Berlin"};
+        double[] siteLat = {LAT_JEDDAH, LAT_DIYARBAKIR, LAT_BERLIN};
+        double[] siteLon = {LON_JEDDAH, LON_DIYARBAKIR, LON_BERLIN};
+
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+        String[] dateNames = {"Mar 21", "Jun 21", "Sep 21", "Dec 21"};
+
+        // G2 Standard geometry
+        int N = 6;
+        double w = FIX_W_CM;
+        double p = FIX_P_CM;
+        double Hr = FIX_HR_CM;
+
+        System.out.printf("Geometry: N=%d, w=%.0f cm, p=%.0f cm, Hr=%.0f cm%n%n", N, w, p, Hr);
+        System.out.printf("%-12s %-8s %7s %14s %14s %14s%n",
+                "Site", "Date", "n", "max resid.", "RMS resid.", "legacy max");
+        System.out.printf("%-12s %-8s %7s %14s %14s %14s%n",
+                "", "", "", "(deg)", "(deg)", "(deg)");
+        System.out.println("-".repeat(74));
+
+        String csv = "tracking_verification.csv";
+        double gMax = 0.0, gLegacyMax = 0.0, gSum = 0.0;
+        int gN = 0;
+
+        try (java.io.PrintWriter out = new java.io.PrintWriter(new java.io.FileWriter(csv))) {
+
+            out.println("site,month,day,hour,minute,mirror,x_m,theta_deg,"
+                    + "residual_deg,legacy_theta_deg,legacy_residual_deg");
+
+            for (int s = 0; s < siteNames.length; s++) {
+
+                SolarCalculator calc = new SolarCalculator(siteLat[s], siteLon[s], 0);
+                MirrorTracker trk = new MirrorTracker();
+
+                SimulationState st = new SimulationState();
+                st.setLatitude(siteLat[s]);
+                st.setLongitude(siteLon[s]);
+                st.setNumReflectors(N);
+                st.setReflectorWidth((float) w);
+                st.setReflectorSpacing((float) p);
+                st.setReceiverHeight((float) Hr);
+                st.setSupportHeight(30.0f);
+                st.setReflectorLength((float) FIX_L_CM);
+                st.setReceiverDiameter((float) FIX_DR_CM);
+
+                double dh = (Hr - 30.0) / 100.0;   // receiver height above mirror plane [m]
+
+                for (int di = 0; di < dates.length; di++) {
+
+                    double maxR = 0.0, sumR2 = 0.0, maxLegacy = 0.0;
+                    int n = 0;
+
+                    for (int h = 4; h <= 20; h++) {
+                        for (int mm = 0; mm < 60; mm += 15) {
+
+                            LocalDateTime t
+                                    = LocalDateTime.of(2024, dates[di][0], dates[di][1], h, mm);
+                            SolarPosition pos = calc.calculateSolarPosition(t);
+                            if (pos.getAltitudeAngle() <= ALT_FLOOR) {
+                                continue;
+                            }
+
+                            double alt = Math.toRadians(pos.getAltitudeAngle());
+                            double azi = Math.toRadians(pos.getAzimuthAngle());
+
+                            // 3-D sun unit vector: x transverse, y north, z up
+                            double sx = -Math.cos(alt) * Math.sin(azi);
+                            double sy = Math.cos(alt) * Math.cos(azi);
+                            double sz = Math.sin(alt);
+
+                            for (int i = 0; i < N; i++) {
+
+                                double off = (i < N / 2) ? -(i + 0.5) : (i - N / 2 + 0.5);
+                                double xm = off * p / 100.0;      // [m]
+
+                                // ---- tracking angle under test ----
+                                double thetaDeg = trk.calculateOptimalMirrorAngle(xm, pos, st);
+                                double th = Math.toRadians(thetaDeg);
+
+                                // ---- independent check: law of reflection ----
+                                double nx = Math.sin(th), nz = Math.cos(th);
+                                double sdotn = sx * nx + sz * nz;          // n_y = 0
+                                double rx = 2.0 * sdotn * nx - sx;
+                                double rz = 2.0 * sdotn * nz - sz;
+
+                                double aimed = Math.atan2(rx, rz);        // reflected, transverse
+                                double target = Math.atan2(-xm, dh);       // toward receiver
+                                double resid = Math.toDegrees(Math.abs(aimed - target));
+                                if (resid > 180.0) {
+                                    resid = Math.abs(resid - 360.0);
+                                }
+
+                                // ---- legacy 3-D vector-sum formulation ----
+                                double tmag = Math.sqrt(xm * xm + dh * dh);
+                                double tx = -xm / tmag, tz = dh / tmag;
+                                double legacyTheta = Math.atan2(sx + tx, sz + tz);
+                                double lnx = Math.sin(legacyTheta), lnz = Math.cos(legacyTheta);
+                                double lsdotn = sx * lnx + sz * lnz;
+                                double lrx = 2.0 * lsdotn * lnx - sx;
+                                double lrz = 2.0 * lsdotn * lnz - sz;
+                                double lResid = Math.toDegrees(
+                                        Math.abs(Math.atan2(lrx, lrz) - target));
+                                if (lResid > 180.0) {
+                                    lResid = Math.abs(lResid - 360.0);
+                                }
+
+                                maxR = Math.max(maxR, resid);
+                                maxLegacy = Math.max(maxLegacy, lResid);
+                                sumR2 += resid * resid;
+                                n++;
+
+                                gMax = Math.max(gMax, resid);
+                                gLegacyMax = Math.max(gLegacyMax, lResid);
+                                gSum += resid * resid;
+                                gN++;
+
+                                out.printf(Locale.US,
+                                        "%s,%d,%d,%d,%d,%d,%.4f,%.6f,%.3e,%.6f,%.6f%n",
+                                        siteNames[s], dates[di][0], dates[di][1], h, mm, i,
+                                        xm, thetaDeg, resid,
+                                        Math.toDegrees(legacyTheta), lResid);
+                            }
+                        }
+                    }
+
+                    if (n == 0) {
+                        continue;
+                    }
+                    System.out.printf("%-12s %-8s %7d %14.3e %14.3e %14.4f%n",
+                            siteNames[s], dateNames[di], n,
+                            maxR, Math.sqrt(sumR2 / n), maxLegacy);
+                }
+            }
+
+            System.out.println("-".repeat(74));
+            System.out.printf("%-12s %-8s %7d %14.3e %14.3e %14.4f%n",
+                    "OVERALL", "", gN, gMax, Math.sqrt(gSum / gN), gLegacyMax);
+
+            System.out.printf("%nSaved: %s%n", csv);
+
+        } catch (java.io.IOException e) {
+            System.err.println("Write error: " + e.getMessage());
+        }
+
+        System.out.println();
+        System.out.println("[Interpretation]");
+        System.out.println("  Residual ~1e-13 deg  -> the tracking solver is exact to machine");
+        System.out.println("  precision: the reflected ray's transverse projection lands on the");
+        System.out.println("  receiver at every sampled instant, for every mirror, at all three");
+        System.out.println("  latitudes and in all four seasons.");
+        System.out.println("  The 'legacy max' column is what the previous 3-D vector-sum");
+        System.out.println("  formulation would have produced. Report both in the manuscript:");
+        System.out.println("  the correction is a genuine methodological result, not an erratum.");
+    }
+
+    // ============================================================================
+// NEW TEST 13 - WELL-POSEDNESS OF THE OPTICAL OBJECTIVE
+//
+// Add to TestOptimization.java and wire in:
+//     case 13 -> runWellPosednessSweep();
+// GUI:  { "Test 13 · Well-posedness",  "Fig. 5  ·  J(N), two modes",  13 },
+//
+// PURPOSE
+// -------
+// Section 4.4 argues that a purely optical objective has no interior optimum
+// in mirror count, and that imposing a minimum geometric concentration ratio
+// renders the problem well posed. At present that argument has to be
+// assembled by the reader from three separate tables. This sweep produces it
+// directly.
+//
+// Two modes, both maximising J = E_opt / A_ground and both with the receiver
+// height optimised independently at every N so that the N dependence is
+// isolated:
+//
+//   MODE A (unconstrained)   w = 10 cm fixed, p = 15 cm fixed.
+//       A_field  = N w L                grows with N
+//       A_ground = [(N-1)p + w] L       grows faster
+//       The packing ratio N w / [(N-1)p + w] falls monotonically toward w/p,
+//       and optical efficiency falls as well. J therefore decreases
+//       monotonically and the optimum sits at the lower bound of N.
+//
+//   MODE B (Cg >= 20)        w = Cg_min * Dr / N,  p = 1.5 w.
+//       N w = Cg_min * Dr = 2.0 m is fixed, so the aperture is constant and
+//       the ground area varies by less than a factor 1.5 over the whole
+//       range. Only the optics change with N: small N means very wide mirrors
+//       (w/Dr = 4 at N = 5, spillage-dominated), large N means a very wide
+//       field (cosine- and end-loss-dominated). An interior optimum is
+//       therefore expected.
+//
+// The feasible range is set by the mirror-width bounds: with Cg_min = 20 and
+// Dr = 10 cm, w = 200/N cm lies in [5, 40] cm for 5 <= N <= 40.
+//
+// OUTPUT
+//   console : optimum N for each mode and site, plus the J profile
+//   file    : wellposedness_sweep.csv  (source data for Fig. 5)
+// ============================================================================
+    public static void runWellPosednessSweep() {
+
+        System.out.println("=== TEST 13: Well-posedness of the optical objective ===\n");
+
+        final double DT_HOURS = 0.25;
+        final double ALT_FLOOR = 5.0;
+        final double CG_MIN = 20.0;
+        final double DR_CM = FIX_DR_CM;      // 10 cm
+        final double L_CM = FIX_L_CM;       // 1000 cm
+
+        final int N_LO = 5, N_HI = 40;           // w = 200/N in [5, 40] cm
+
+        // receiver-height search: uniform in Hr/Wf
+        final double R_LO = 0.10, R_HI = 2.00;
+        final int R_N = 40;
+
+        String[] siteNames = {"Jeddah", "Diyarbakir", "Berlin"};
+        double[] siteLat = {LAT_JEDDAH, LAT_DIYARBAKIR, LAT_BERLIN};
+        double[] siteLon = {LON_JEDDAH, LON_DIYARBAKIR, LON_BERLIN};
+
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+
+        System.out.printf("Mode A: w=10 cm, p=15 cm fixed%n");
+        System.out.printf("Mode B: w=%.0f/N cm so that Cg=%.0f, p=1.5w%n",
+                CG_MIN * DR_CM, CG_MIN);
+        System.out.printf("Hr optimised at every N over Hr/Wf in [%.2f, %.2f]%n%n",
+                R_LO, R_HI);
+
+        String csv = "wellposedness_sweep.csv";
+        try (java.io.PrintWriter out = new java.io.PrintWriter(new java.io.FileWriter(csv))) {
+
+            out.println("site,mode,N,w_cm,p_cm,Wf_m,Hr_opt_cm,A_field_m2,"
+                    + "A_ground_m2,energy_kWh,J_Wh_per_m2");
+
+            for (int s = 0; s < siteNames.length; s++) {
+
+                SolarCalculator calc = new SolarCalculator(siteLat[s], siteLon[s], 0);
+                List<LocalDateTime> times = new ArrayList<>();
+                for (int[] dt : dates) {
+                    for (int h = 3; h <= 21; h++) {
+                        for (int mm = 0; mm < 60; mm += 15) {
+                            LocalDateTime t = LocalDateTime.of(2024, dt[0], dt[1], h, mm);
+                            if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) {
+                                times.add(t);
+                            }
+                        }
+                    }
+                }
+                if (times.isEmpty()) {
+                    continue;
+                }
+
+                FresnelDesignProblem prob
+                        = new FresnelDesignProblem(siteLat[s], siteLon[s], times);
+
+                for (int mode = 0; mode < 2; mode++) {
+
+                    String modeName = (mode == 0) ? "A_unconstrained" : "B_Cg20";
+                    double bestJ = -1.0;
+                    int bestN = 0;
+
+                    System.out.printf("--- %s | mode %s ---%n", siteNames[s], modeName);
+                    System.out.printf("%6s %8s %8s %9s %11s %14s%n",
+                            "N", "w(cm)", "p(cm)", "Wf(m)", "Hr_opt(cm)", "J(Wh/m2)");
+
+                    for (int N = N_LO; N <= N_HI; N++) {
+
+                        double w_cm, p_cm;
+                        if (mode == 0) {
+                            w_cm = 10.0;
+                            p_cm = 15.0;
+                        } else {
+                            w_cm = CG_MIN * DR_CM / N;      // Cg exactly at the bound
+                            p_cm = 1.5 * w_cm;
+                        }
+
+                        double Wf_m = ((N - 1) * p_cm + w_cm) / 100.0;
+                        double ground = Wf_m * (L_CM / 100.0);
+                        double aperture = N * (w_cm / 100.0) * (L_CM / 100.0);
+
+                        // optimise receiver height at this N
+                        double bestE = -1.0;
+                        double bestHr = 0.0;
+                        for (int k = 0; k <= R_N; k++) {
+                            double ratio = R_LO + (R_HI - R_LO) * k / (double) R_N;
+                            double hrCm = ratio * Wf_m * 100.0;
+                            if (hrCm < 40.0) {
+                                continue;      // structural clearance
+                            }
+                            DesignParameters params
+                                    = new DesignParameters(hrCm, w_cm, p_cm, N);
+
+                            double energyWh = 0.0;
+                            for (LocalDateTime t : times) {
+                                energyWh += prob.evaluateOpticalMetrics(params, t)
+                                        .get("Q_opt") * DT_HOURS;
+                            }
+                            if (energyWh > bestE) {
+                                bestE = energyWh;
+                                bestHr = hrCm;
+                            }
+                        }
+                        if (bestE < 0) {
+                            continue;
+                        }
+
+                        double J = bestE / ground;
+                        if (J > bestJ) {
+                            bestJ = J;
+                            bestN = N;
+                        }
+
+                        // print every fifth point to keep the console readable
+                        if (N % 5 == 0 || N == N_LO) {
+                            System.out.printf("%6d %8.2f %8.2f %9.3f %11.0f %14.1f%n",
+                                    N, w_cm, p_cm, Wf_m, bestHr, J);
+                        }
+
+                        out.printf(Locale.US,
+                                "%s,%s,%d,%.3f,%.3f,%.4f,%.1f,%.4f,%.4f,%.4f,%.4f%n",
+                                siteNames[s], modeName, N, w_cm, p_cm, Wf_m, bestHr,
+                                aperture, ground, bestE / 1000.0, J);
+                    }
+
+                    String flag = (bestN == N_LO || bestN == N_HI)
+                            ? "  <-- AT A BOUND, no interior optimum"
+                            : "  <-- interior optimum";
+                    System.out.printf("  optimum: N = %d, J = %.1f Wh/m2%s%n%n",
+                            bestN, bestJ, flag);
+                }
+            }
+
+            System.out.printf("Saved: %s%n", csv);
+
+        } catch (java.io.IOException e) {
+            System.err.println("Write error: " + e.getMessage());
+        }
+
+        System.out.println();
+        System.out.println("[Expected reading]");
+        System.out.println("  Mode A drives N to its lower bound: the optical objective alone");
+        System.out.println("  cannot size the field. Mode B, with the concentration ratio held");
+        System.out.println("  at its thermal minimum, produces a genuine interior optimum.");
+        System.out.println("  If mode B also lands on a bound, the argument of Section 4.4");
+        System.out.println("  needs revising and should be reported as such.");
     }
 }
