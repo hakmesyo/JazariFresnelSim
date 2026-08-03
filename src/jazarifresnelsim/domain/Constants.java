@@ -41,14 +41,17 @@ public final class Constants {
     public static final double MIRROR_REFLECTIVITY = 0.92;
 
     /**
-     * Effective optical error sigma_opt [rad] — Eq. (12).
-     * Combines sunshape half-angle (~2.3 mrad) and representative
-     * mirror slope error (~2.0 mrad) via RSS:
-     *   sigma_opt = sqrt(2.3^2 + 2.0^2) ~= 4.65 mrad
-     * Reference: Rabl (1985), Grena (2024).
+     * Effective optical error sigma_opt [rad] — standard deviation of the
+     * 1-D projection of the solar disc, used in the spillage convolution
+     * of Eq. (15). The sun is declared by its geometric half-angle
+     * (4.65 mrad); the 1-D projection of a uniform disc onto one
+     * transverse axis has standard deviation half of that, i.e.
+     * sigma_opt = 4.65 / 2 = 2.325 mrad. Confirmed by direct measurement
+     * against SolTrace: 2.333 mrad over a 5 m path (2e4 rays). No mirror
+     * slope error is included, consistent with the ray-tracing
+     * configuration used for validation (manuscript Sec. 4.4, Pitfall 3).
      */
-    public static final double SIGMA_OPT = 4.65e-3;
-    //public static final double SIGMA_OPT = 8.0e-3;
+    public static final double SIGMA_OPT = 2.325e-3;
 
     /** Solar constant [W/m^2] — Hottel clear-sky DNI model. */
     public static final double SOLAR_CONSTANT = 1361.0;

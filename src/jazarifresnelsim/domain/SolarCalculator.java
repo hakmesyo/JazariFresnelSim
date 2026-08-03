@@ -10,25 +10,30 @@ import java.util.List;
 /**
  * Solar position calculation and per-mirror optical performance metrics.
  *
- * Optical model implements Equations (1)–(14) of the manuscript: - Spencer
+ * Optical model implements Equations (1)–(15) of the manuscript: - Spencer
  * 7-term Fourier solar position Eq. (1)–(5) - Cosine efficiency Eq. (9) -
- * First-order spillage correction Eq. (12)–(13) - End-loss efficiency Eq. (11)
- * - Overall optical efficiency Eq. (14)
+ * End-loss efficiency Eq. (11) - First-order spillage correction Eq. (14)–(15)
+ * - Overall optical efficiency Eq. (16)
  *
- * VERSION 4.3 — End-loss formula corrected. CHANGE:
- * calculateEndLossEfficiency() now uses the mirror's horizontal offset |x_i| as
- * the lever-arm distance, not the slant distance sqrt(x_i^2 + deltaH^2). This
- * matches Eq. (11) as stated in the manuscript and in Bellos et al. [7] /
- * Santos et al. [36]:
- *
- * f_end,i = max(0, 1 - |x_i| * |tan(theta_L)| / L)
- *
- * The slant distance was an implementation error introduced in an earlier
- * version that caused severe over-prediction of end losses for peripheral
- * mirrors (especially at non-noon hours).
+ * VERSION 4.4 — End-loss lever arm and spillage absorber projection
+ * corrected against the ray-tracing validation (manuscript Sec. 4.3–4.4,
+ * Pitfalls 2 and 3):
+ *  - calculateEndLossEfficiency() uses the slant distance
+ *    d_i = sqrt(x_i^2 + (H_r-H_s)^2) as the lever arm, per Eq. (11). An
+ *    earlier version used the horizontal offset |x_i| alone, which assigns
+ *    zero end loss to the central mirror — impossible, since a ray leaving
+ *    the central mirror still travels (H_r-H_s) vertically and drifts
+ *    longitudinally over that path.
+ *  - calculateSpillageLoss() presents the flat absorber strip as
+ *    R_i = 0.5*D_r*cos(psi_t,i), per Eq. (13); an earlier version used
+ *    0.5*D_r unconditionally, correct for a tube but not for the flat strip
+ *    used throughout this study.
+ *  - Constants.SIGMA_OPT is the standard deviation of the sun's projected
+ *    angular width (2.325 mrad), not its declared half-angle (4.65 mrad);
+ *    see Constants.java and manuscript Sec. 4.4.
  *
  * @author Yunus Demirtas, Musa Atas — Siirt University
- * @version 4.3
+ * @version 4.4
  */
 public class SolarCalculator {
 
@@ -138,49 +143,17 @@ public class SolarCalculator {
         return Math.abs(sx * nx + sy * ny + sz * nz);
     }
 
-// ============================================================================
-// PHASE 0 - TWO PHYSICS CORRECTIONS in SolarCalculator.java
-//
-// Replace the two existing methods with the versions below and add the two
-// small helpers at the end of the class. Nothing else changes.
-//
-// Also in Constants.java, make sure this line is the ACTIVE one:
-//     public static final double SIGMA_OPT = 4.65e-3;
-// (the 8.0e-3 variant must stay commented out)
-// ============================================================================
-// ============================================================================
-// FIX 1 - END LOSS
-//
-// WHY THE PREVIOUS VERSION WAS WRONG
-// ----------------------------------
-//     f_end = max(0, 1 - |x_i| * tan(theta_L) / L)
-//
-// Two independent errors.
-//
-// (a) LEVER ARM. The longitudinal drift of the reflected ray is proportional
-//     to the distance it travels from mirror to receiver, not to the mirror's
-//     transverse offset. Since a single-axis mirror cannot alter the
-//     longitudinal component of the ray, r_y = -s_y throughout, and
-//
-//         Delta_y = r_y * (Hr - Hs) / r_z ,
-//         r_z     = (Hr - Hs) * sqrt(1 - s_y^2) / d_i
-//     =>  |Delta_y| = d_i * |s_y| / sqrt(1 - s_y^2)
-//
-//     with d_i = sqrt(x_i^2 + (Hr - Hs)^2). The lever arm is the SLANT
-//     distance d_i.
-//
-//     The old form assigned ZERO end loss to the central mirror (x_i = 0),
-//     which is impossible: a ray leaving the centre mirror still travels
-//     (Hr - Hs) vertically and drifts longitudinally over that path. For the
-//     G2 geometry at solar noon the correct central-mirror loss is 2.56%,
-//     and the field average is 2.64% against 0.58% previously.
-//
-// (b) LONGITUDINAL ANGLE. theta_L is the angle between the sun vector and the
-//     plane normal to the tracking axis, i.e. sin(theta_L) = s_y, hence
-//     tan(theta_L) = s_y / sqrt(1 - s_y^2). The previous form used
-//     s_y / s_z = cos(A)/tan(alpha), which is the ratio to the VERTICAL
-//     component rather than to the transverse projection.
-// ============================================================================
+    /**
+     * End-loss efficiency f_end,i — Eq. (11). A single-axis mirror cannot
+     * alter the longitudinal component of the reflected ray (r_y = -s_y
+     * throughout), so the longitudinal drift over the mirror-to-receiver
+     * path is |dy| = d_i*|s_y|/sqrt(1-s_y^2), with the lever arm given by
+     * the slant distance d_i = sqrt(x_i^2 + (H_r-H_s)^2), not the
+     * transverse offset |x_i| alone: a ray leaving the central mirror
+     * (x_i = 0) still travels (H_r-H_s) vertically and drifts
+     * longitudinally over that path, so its end loss cannot be zero.
+     * theta_L is the longitudinal incidence angle, sin(theta_L) = s_y.
+     */
     public double calculateEndLossEfficiency(MirrorPosition mirror,
             SolarPosition sunPos,
             SimulationState state) {
@@ -212,10 +185,8 @@ public class SolarCalculator {
     }
 
 // ============================================================================
-// FIX 2 - SPILLAGE
+// SPILLAGE — closed-form beam-intercept fraction, Eq. (14)-(15).
 //
-// WHY THE PREVIOUS VERSION WAS WRONG
-// ----------------------------------
 // The reflected image of a flat mirror is a UNIFORM distribution of width
 // w*cos(theta_i), convolved with the angular error distribution. The previous
 // code replaced the uniform by a Gaussian of equal variance (sigma = W/sqrt12)
@@ -242,6 +213,17 @@ public class SolarCalculator {
 // Limits are correct by construction:
 //     a -> 0  =>  f = erf( R / (s*sqrt2) )     (pure Gaussian)
 //     s -> 0  =>  f = min(1, R/a)              (pure geometric)
+//
+// Two further parameters matter here (manuscript Sec. 4.4, Pitfall 3):
+//   - The aperture half-width R = 0.5*D_r*cos(psi_t,i), Eq. (13): the flat,
+//     downward-facing absorber strip presents less than its full width
+//     D_r to a ray arriving off-vertical. Using D_r unconditionally is
+//     correct for a tube but not for the flat strip used throughout this
+//     study, and was the largest source of disagreement against SolTrace
+//     in an earlier version.
+//   - Constants.SIGMA_OPT (2.325 mrad) is a standard deviation, not the
+//     sun's declared geometric half-angle (4.65 mrad); the two differ by a
+//     factor of two for a uniform disc.
 // ============================================================================
     public double calculateSpillageLoss(MirrorPosition mirror,
             SimulationState state) {
@@ -257,12 +239,23 @@ public class SolarCalculator {
 
         double tilt = Math.toRadians(mirror.getRotationAngle());
 
-        double a = 0.5 * w_m * Math.abs(Math.cos(tilt));  // uniform half-width [m]
-        double s = d_i * Constants.SIGMA_OPT;             // Gaussian sigma    [m]
-        double R = 0.5 * Dr_m;                            // aperture half-width [m]
+        // uniform half-width of the mirror image, perpendicular to the beam
+        double a = 0.5 * w_m * Math.abs(Math.cos(tilt));
+
+        // Gaussian spread from the angular error
+        double s = d_i * Constants.SIGMA_OPT;
+
+        // Flat absorber: effective half-width seen along the reflected ray.
+        // psi_t is the angle of that ray from the vertical (Eq. 13 of the
+        // manuscript, R_i = 0.5*D_r*cos(psi_t,i)).
+        double psi_t = Math.atan2(Math.abs(xi_m), Math.max(1e-12, dh));
+        double R = 0.5 * Dr_m * Math.cos(psi_t);
 
         if (a < 1e-12) {
             return 1.0;                        // vanishing image
+        }
+        if (R <= 0.0) {
+            return 0.0;
         }
         if (s < 1e-12) {
             return Math.min(1.0, R / a);       // no angular spread
