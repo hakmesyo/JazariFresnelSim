@@ -245,14 +245,14 @@ public class DesignFresnelSystemFrame extends JFrame {
 
         // --- Optimization Bounds (4 variables: Hr, w, p, N) ---
         JPanel boundsGroup = makeGroup("Optimization Search Bounds (Min – Max)");
-        JTextField minMirrors = makeField(String.valueOf(ConfigManager.getInt("min_mirrors", 2)));
-        JTextField maxMirrors = makeField(String.valueOf(ConfigManager.getInt("max_mirrors", 10)));
-        JTextField minRecH = makeField(String.valueOf(ConfigManager.getDouble("min_rec_height", 30.0)));
-        JTextField maxRecH = makeField(String.valueOf(ConfigManager.getDouble("max_rec_height", 300.0)));
+        JTextField minMirrors = makeField(String.valueOf(ConfigManager.getInt("min_mirrors", 4)));
+        JTextField maxMirrors = makeField(String.valueOf(ConfigManager.getInt("max_mirrors", 50)));
+        JTextField minRecH = makeField(String.valueOf(ConfigManager.getDouble("min_rec_height", 50.0)));
+        JTextField maxRecH = makeField(String.valueOf(ConfigManager.getDouble("max_rec_height", 600.0)));
         JTextField minMirW = makeField(String.valueOf(ConfigManager.getDouble("min_mirror_width", 5.0)));
-        JTextField maxMirW = makeField(String.valueOf(ConfigManager.getDouble("max_mirror_width", 30.0)));
+        JTextField maxMirW = makeField(String.valueOf(ConfigManager.getDouble("max_mirror_width", 40.0)));
         JTextField minMirS = makeField(String.valueOf(ConfigManager.getDouble("min_mirror_spacing", 15.0)));
-        JTextField maxMirS = makeField(String.valueOf(ConfigManager.getDouble("max_mirror_spacing", 80.0)));
+        JTextField maxMirS = makeField(String.valueOf(ConfigManager.getDouble("max_mirror_spacing", 150.0)));
 
         boundsGroup.add(makeMinMax("Number of Mirrors N:", minMirrors, maxMirrors));
         boundsGroup.add(makeMinMax("Receiver Height Hr (cm):", minRecH, maxRecH));

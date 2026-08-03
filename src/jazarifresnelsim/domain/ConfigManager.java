@@ -29,12 +29,6 @@ public class ConfigManager {
         // ============================================================
         // 1. FIXED GEOMETRY (Base Configuration)
         // ============================================================
-        // L = 1000 cm (10 m): Pilot-plant scale, consistent with literature
-        //   (Barbón et al. 2021: 3-5 m; Moghimi et al. 2015: 12 m).
-        //   Keeps end losses realistic but not dominant across all geometries.
-        // Dr = 10 cm: Mid-range single-tube receiver diameter.
-        //   Literature range: 7-18 cm (Zhu et al. 2014).
-        //   Matches Barbón et al. experimental setup ensuring internal consistency.
         defaults.setProperty("num_mirrors",          "6");
         defaults.setProperty("mirror_width_cm",      "20.0");
         defaults.setProperty("mirror_spacing_cm",    "25.0");
@@ -51,36 +45,26 @@ public class ConfigManager {
         defaults.setProperty("altitude_m",    "600.0");
 
         // ============================================================
-        // 3. OPTIMIZATION BOUNDS (Search Space Constraints)
+        // 3. OPTIMIZATION BOUNDS (Search Space Constraints, manuscript Sec. 5.6)
         // ============================================================
-        
-        // MIRROR COUNT (N)
-        // Min 4: A smaller field cannot provide sufficient concentration for industrial steam.
-        // Max 30: Extremely wide fields suffer from severe spillage and shading.
+
+        // MIRROR COUNT (N) — manuscript range [4, 50]
         defaults.setProperty("min_mirrors",       "4");
         defaults.setProperty("max_mirrors",       "50");
-        
-        // RECEIVER HEIGHT (Hr)
-        // Min 50 cm: Structural clearance limit.
-        // Max 300 cm: Practical threshold for small-to-medium pilot plants to avoid excessive wind load.
-        defaults.setProperty("min_rec_height",    "100.0");
+
+        // RECEIVER HEIGHT (Hr) — manuscript range [50, 600] cm
+        defaults.setProperty("min_rec_height",    "50.0");
         defaults.setProperty("max_rec_height",    "600.0");
-        
-        // RECEIVER DIAMETER (Dr) - Often fixed, but bounds kept for UI flexibility.
+
+        // RECEIVER DIAMETER (Dr) - fixed in this study; bounds kept for UI flexibility.
         defaults.setProperty("min_rec_diam",      "5.0");
         defaults.setProperty("max_rec_diam",      "50.0");
-        
-        // MIRROR WIDTH (w)
-        // CRITICAL CONSTRAINT: 
-        // Min 15 cm: Narrower mirrors require too many tracking drives, increasing CAPEX drastically.
-        // Max 60 cm: Wider flat mirrors suffer from excessive transversal aberration (optical defocusing).
+
+        // MIRROR WIDTH (w) — manuscript range [5, 40] cm
         defaults.setProperty("min_mirror_width",  "5.0");
         defaults.setProperty("max_mirror_width",  "40.0");
-        
-        // MIRROR SPACING (p) - Center-to-center distance
-        // CRITICAL CONSTRAINT:
-        // Min 20 cm: Must be strictly > w to leave a physical gap for rotation and wind clearance.
-        // Max 100 cm: Prevents the optimizer from wasting land area excessively.
+
+        // MIRROR SPACING (p) — manuscript range [15, 150] cm
         defaults.setProperty("min_mirror_spacing","15.0");
         defaults.setProperty("max_mirror_spacing","150.0");
 
