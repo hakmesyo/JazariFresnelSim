@@ -13,6 +13,8 @@ import java.time.Month;
 import java.util.*;
 import jazarifresnelsim.domain.MirrorTracker;
 import jazarifresnelsim.models.SimulationState;
+import jazarifresnelsim.ui.ChartPanel;
+import java.awt.Color;
 
 /**
  * Validation and optimization test suite for JazariFresnelSim.
@@ -40,6 +42,7 @@ public class TestOptimization {
     private static final double LON_JEDDAH = 39.19;
 
     private static final int NUM_RUNS = 30;
+    private static final int NUM_RUNS_TABLE10 = 10;   // manuscript: "ten independent runs"
 
     // ================================================================
 // MANUSCRIPT VALIDATION FIXTURE
@@ -82,31 +85,22 @@ public class TestOptimization {
 
         switch (choice) {
             case 1 ->
-                runExtremeAngleAnalysis();
+                runSolarPositionVerification();
             case 2 ->
-                runMirrorCountScaling();
+                runTrackingVerification();
             case 3 ->
-                runGlobalOptimization();
-            //runOptimizationComparison();
+                runTable6();
             case 4 ->
-                runTemporalSensitivity();
+                runMirrorCountScaling();
             case 5 ->
                 runSpacingSweepExport();
             case 6 ->
-                runHeightSweepExport();
+                runOptimizationComparison();
             case 7 ->
-                runDailyEfficiencyProfile();
+                runTemporalSensitivity();
             case 8 ->
-                runConvergenceExport();
+                runHeightSweepExport();
             case 9 ->
-                runSolTraceValidation();
-            case 10 ->
-                runTable6();
-            case 11 ->
-                runSolarPositionVerification();
-            case 12 ->
-                runTrackingVerification();
-            case 13 ->
                 runWellPosednessSweep();
             case 0 ->
                 runAllTests();
@@ -118,7 +112,9 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 1 -- Extreme-angle annual error analysis (Table 8, Fig. 4)
+    // [WITHDRAWN -- not wired to any button or test ID] Extreme-angle
+    // annual error analysis. Not referenced anywhere in the manuscript;
+    // kept for reference only.
     // ================================================================
     public static void runExtremeAngleAnalysis() {
         System.out.println("=== TEST 1: Extreme-Angle Annual Error (Table 8) ===\n");
@@ -172,10 +168,10 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 2 -- Mirror count scaling (Table 12)
+    // TEST 4 -- Mirror count scaling (Table 6)
     // ================================================================
     public static void runMirrorCountScaling() {
-        System.out.println("\n=== TEST 2: Mirror Count Scaling (Table 12) ===");
+        System.out.println("\n=== TEST 4: Mirror Count Scaling (Table 6) ===");
 
 //        double w = ConfigManager.getDouble("min_mirror_width", 10.0);
 //        double p = ConfigManager.getDouble("min_mirror_spacing", 15.0);
@@ -211,76 +207,103 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 3 -- Metaheuristic optimization (Table 14--15, Fig. 9)
+    // TEST 6 -- Metaheuristic optimization (Table 10)
+    //
+    // Reproduces the manuscript's constrained optimization exactly:
+    //   - H = 40 evaluation hours (4 representative days x 10 daytime hours,
+    //     08:00-17:00), matching Table 10's stated H column.
+    //   - 10 independent runs per algorithm, per the table caption.
+    //   - All three sites (Jeddah, Diyarbakir, Berlin), each reported
+    //     separately as in Table 10.
+    //   - The objective returned by FresnelDesignProblem.evaluateDesign() is
+    //     J, daily optical energy per unit ground area [Wh/m2], subject to
+    //     the hard C_g >= 20 constraint (Eq. 18) -- NOT a raw kWh yield.
     // ================================================================
     public static void runOptimizationComparison() {
-        System.out.println("=== TEST 3: Metaheuristic Optimization (Table 14--15) ===");
-        System.out.printf("Site: %.2fdegN %.2fdegE | H=144 | %d runs/algorithm%n%n",
-                LAT_DIYARBAKIR, LON_DIYARBAKIR, NUM_RUNS);
-        try {
-            List<LocalDateTime> times = evaluationTimes(144);
-            FresnelDesignProblem problem = new FresnelDesignProblem(
-                    LAT_DIYARBAKIR, LON_DIYARBAKIR, times);
-            // Initial guess -- 4-param constructor
-            DesignParameters init = new DesignParameters(130.0, 10.0, 15.0, 4);
-            List<IOptimizationAlgorithm> algos = buildAlgorithms();
-            DesignEvaluator evaluator = new DesignEvaluator(problem, times);
-            OptimizationComparison comp
-                    = new OptimizationComparison(evaluator, algos.size(), NUM_RUNS);
-            printOptResults(comp.compareAlgorithms(algos, problem, init, new HashMap<>()));
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
+        System.out.println("=== TEST 6: Metaheuristic Optimization (Table 10) ===");
+        System.out.printf("H=40 (4 representative days x 10 h) | %d runs/algorithm | Cg >= 20%n%n",
+                NUM_RUNS_TABLE10);
+
+        String[] siteNames = {"Jeddah", "Diyarbakir", "Berlin"};
+        double[] siteLat = {LAT_JEDDAH, LAT_DIYARBAKIR, LAT_BERLIN};
+        double[] siteLon = {LON_JEDDAH, LON_DIYARBAKIR, LON_BERLIN};
+
+        for (int s = 0; s < siteNames.length; s++) {
+            try {
+                List<LocalDateTime> times = table10EvaluationTimes();
+                // TMY constructor: lets FresnelDesignProblem.evaluateDesign()
+                // pull real seasonal/hourly DNI from SolarData for this site,
+                // instead of falling back to the Hottel clear-sky model.
+                FresnelDesignProblem problem = new FresnelDesignProblem(
+                        siteNames[s], siteLat[s], siteLon[s]);
+                // Initial guess -- 4-param constructor
+                DesignParameters init = new DesignParameters(130.0, 10.0, 15.0, 4);
+                List<IOptimizationAlgorithm> algos = buildAlgorithms();
+                DesignEvaluator evaluator = new DesignEvaluator(problem, times);
+                OptimizationComparison comp = new OptimizationComparison(
+                        evaluator, algos.size(), NUM_RUNS_TABLE10);
+                printOptResults(siteNames[s],
+                        comp.compareAlgorithms(algos, problem, init, new HashMap<>()));
+            } catch (Exception e) {
+                System.err.println("Error (" + siteNames[s] + "): " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 
-    private static void printOptResults(OptimizationComparison.ComparisonResult results) {
+    /**
+     * H = 40 evaluation grid used by Table 10: four representative days
+     * (equinoxes + solstices), 10 daytime hours each (08:00-17:00). This is
+     * the same grid FresnelDesignProblem.evaluateDesign() falls back to
+     * internally when no explicit evaluation times are supplied (TMY mode
+     * without a loaded dataset), reproduced explicitly here so the test does
+     * not depend on which SolarData sets happen to be present.
+     */
+    private static List<LocalDateTime> table10EvaluationTimes() {
+        List<LocalDateTime> times = new ArrayList<>();
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+        for (int[] d : dates) {
+            for (int h = 8; h < 18; h++) {
+                times.add(LocalDateTime.of(2024, d[0], d[1], h, 0));
+            }
+        }
+        return times;
+    }
+
+    private static void printOptResults(String siteName,
+            OptimizationComparison.ComparisonResult results) {
         var stats = results.getStatistics();
-        System.out.println("\n--- Algorithm Performance (Table 14) ---");
-        System.out.printf("%-26s %10s %14s %10s %18s%n",
-                "Algorithm", "Time (s)", "Best (kWh)", "Std dev", "Convergence");
-        System.out.println("-".repeat(80));
-        // Use arrays as effectively-final containers so lambda can capture them
-        String[] bestAlgo = {""};
-        double[] bestYield = {Double.NEGATIVE_INFINITY};
+        System.out.printf("--- %s (Table 10) ---%n", siteName);
+        System.out.printf("%-26s %6s %14s %10s %10s %6s %10s %6s%n",
+                "Algorithm", "H (h)", "Best J (Wh/m2)", "Std dev", "Time (s)",
+                "N", "Hr (cm)", "Cg");
+        System.out.println("-".repeat(90));
 
         for (var e : stats.entrySet()) {
             var s = e.getValue();
-            String type = s.objectiveStats.stdDev < 0.01 ? "Global"
-                    : s.objectiveStats.stdDev < 15.0 ? "Near-global" : "Local/inconsistent";
-            System.out.printf("%-26s %10.2f %14.2f %10.2f %18s%n",
-                    e.getKey(), s.timeStats.mean / 1000.0,
-                    s.objectiveStats.max, s.objectiveStats.stdDev, type);
-            if (s.objectiveStats.max > bestYield[0]) {
-                bestYield[0] = s.objectiveStats.max;
-                bestAlgo[0] = e.getKey();
-            }
+            var runsForAlgo = results.getAlgorithmRuns().get(e.getKey());
+            DesignParameters best = (runsForAlgo == null) ? null
+                    : runsForAlgo.stream()
+                            .max(Comparator.comparing(r -> r.getBestSolution().getObjectiveValue()))
+                            .map(r -> r.getBestSolution().getParameters())
+                            .orElse(null);
+            double cg = (best == null) ? Double.NaN
+                    : (best.getNumberOfMirrors() * best.getMirrorWidth()) / best.getReceiverDiameter();
+            System.out.printf("%-26s %6d %14.1f %10.1f %10.2f %6s %10s %6s%n",
+                    e.getKey(), 40, s.objectiveStats.max, s.objectiveStats.stdDev,
+                    s.timeStats.mean / 1000.0,
+                    best == null ? "--" : String.valueOf(best.getNumberOfMirrors()),
+                    best == null ? "--" : String.format(Locale.US, "%.1f", best.getReceiverHeight()),
+                    best == null ? "--" : String.format(Locale.US, "%.1f", cg));
         }
-        var runs = results.getAlgorithmRuns().get(bestAlgo[0]);
-        if (runs != null) {
-            runs.stream()
-                    .max(Comparator.comparing(r -> r.getBestSolution().getObjectiveValue()))
-                    .ifPresent(r -> {
-                        DesignParameters p = r.getBestSolution().getParameters();
-                        System.out.printf("%n--- Best solution (%s) ---%n"
-                                + "  Hr=%.1f cm, w=%.1f cm, p=%.1f cm, N=%d%n"
-                                + "  Dr=%.1f cm (fixed) | Yield = %.2f kWh%n",
-                                bestAlgo[0],
-                                p.getReceiverHeight(),
-                                p.getMirrorWidth(),
-                                p.getMirrorSpacing(),
-                                p.getNumberOfMirrors(),
-                                p.getReceiverDiameter(),
-                                bestYield[0]);
-                    });
-        }
+        System.out.println();
     }
 
     // ================================================================
-    // TEST 4 -- Temporal discretization sensitivity (Table 15)
+    // TEST 7 -- Temporal discretization sensitivity (Table 11)
     // ================================================================
     public static void runTemporalSensitivity() {
-        System.out.println("=== TEST 4: Temporal Discretization Sensitivity (Table 15) ===\n");
+        System.out.println("=== TEST 7: Temporal Discretization Sensitivity (Table 11) ===\n");
         int[] hVals = {144, 288, 4380};
         String[] labels = {"144 (12 mo x 12 h)", "288 (12 mo x 24 h)", "4380 (full year)"};
         System.out.printf("%-22s %6s %8s %12s %10s%n",
@@ -303,7 +326,7 @@ public class TestOptimization {
     }
 
 // ============================================================================
-// REPLACEMENT for TestOptimization.runSpacingSweepExport()   [v2 - ENERGY BASED]
+// REPLACEMENT for TestOptimization.runSpacingSweepExport()   [TEST 5 - ENERGY BASED, Table 7]
 //
 // WHY v1 WAS UNRELIABLE
 // ---------------------
@@ -343,9 +366,89 @@ public class TestOptimization {
 // FILE OUTPUT
 //   pw_sweep_energy.csv - full curves for Fig. 6
 // ============================================================================
+    /**
+     * Chart data for Fig. 3 (p/w sweep): (a) energy-optimal p/w vs
+     * representative day, per site; (b) E/Emax vs p/w for Dec 21 (the most
+     * demanding case), per site, showing the flatness of the optimum.
+     */
+    public static ChartPanel.Spec[] getFig3ChartData() {
+        final double w = 10.0, Hr = 130.0;
+        final int N = 6;
+        final double DT_HOURS = 0.25, ALT_FLOOR = 5.0;
+        double[] pwRatios = {1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0,
+            2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0};
+
+        String[] siteNames = {"Diyarbakir", "Berlin", "Jeddah"};
+        double[][] siteCoords = {{LAT_DIYARBAKIR, LON_DIYARBAKIR}, {LAT_BERLIN, LON_BERLIN},
+            {LAT_JEDDAH, LON_JEDDAH}};
+        Color[] colors = {new Color(31, 119, 180), new Color(44, 160, 44), new Color(214, 39, 40)};
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+        String[] dateNames = {"Mar", "Jun", "Sep", "Dec"};
+
+        List<ChartPanel.Series> seriesA = new ArrayList<>();
+        List<ChartPanel.Series> seriesB = new ArrayList<>();
+
+        for (int s = 0; s < siteNames.length; s++) {
+            double[] optPw = new double[dates.length];
+            double[] dayX = new double[dates.length];
+
+            for (int d = 0; d < dates.length; d++) {
+                List<LocalDateTime> grid = new ArrayList<>();
+                for (int h = 3; h <= 21; h++) {
+                    for (int mm = 0; mm < 60; mm += 15) {
+                        grid.add(LocalDateTime.of(2024, dates[d][0], dates[d][1], h, mm));
+                    }
+                }
+                SolarCalculator calc = new SolarCalculator(siteCoords[s][0], siteCoords[s][1], 0);
+                List<LocalDateTime> times = new ArrayList<>();
+                for (LocalDateTime t : grid) {
+                    if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) times.add(t);
+                }
+                if (times.isEmpty()) continue;
+                FresnelDesignProblem prob = new FresnelDesignProblem(siteCoords[s][0], siteCoords[s][1], times);
+
+                double bestE = -1.0, bestPw = 0.0;
+                double[] pwCurve = new double[pwRatios.length];
+                for (int i = 0; i < pwRatios.length; i++) {
+                    double p = pwRatios[i] * w;
+                    DesignParameters params = new DesignParameters(Hr, w, p, N);
+                    double e = 0.0;
+                    for (LocalDateTime t : times) {
+                        e += prob.evaluateOpticalMetrics(params, t).get("Q_opt") * DT_HOURS;
+                    }
+                    pwCurve[i] = e;
+                    if (e > bestE) { bestE = e; bestPw = pwRatios[i]; }
+                }
+                optPw[d] = bestPw;
+                dayX[d] = d + 1;
+
+                if (dates[d][0] == 12) {   // Dec 21 -> panel (b)
+                    double[] eNorm = new double[pwCurve.length];
+                    for (int i = 0; i < pwCurve.length; i++) eNorm[i] = pwCurve[i] / bestE;
+                    seriesB.add(new ChartPanel.Series(siteNames[s], colors[s], pwRatios, eNorm,
+                            ChartPanel.Style.LINE));
+                }
+            }
+            seriesA.add(new ChartPanel.Series(siteNames[s], colors[s], dayX, optPw,
+                    ChartPanel.Style.LINE_MARKER));
+        }
+
+        ChartPanel.Spec a = new ChartPanel.Spec();
+        a.title = "(a) optimal p/w by season";
+        a.xLabel = "1=Mar 2=Jun 3=Sep 4=Dec"; a.yLabel = "optimal p/w";
+        a.series = seriesA;
+
+        ChartPanel.Spec b = new ChartPanel.Spec();
+        b.title = "(b) E/Emax vs p/w, Dec 21";
+        b.xLabel = "p/w"; b.yLabel = "E / Emax";
+        b.series = seriesB;
+
+        return new ChartPanel.Spec[]{a, b};
+    }
+
     public static void runSpacingSweepExport() {
 
-        System.out.println("=== TEST 5 v2: p/w Sweep, ENERGY BASED | 3 sites x 4 seasons ===\n");
+        System.out.println("=== TEST 5: p/w Sweep, ENERGY BASED | 3 sites x 4 seasons (Table 7) ===\n");
 
         final double w = 10.0;    // mirror width    [cm]  fixed
         final double Hr = 130.0;   // receiver height [cm]  fixed
@@ -482,7 +585,7 @@ public class TestOptimization {
     }
 
 // ============================================================================
-// REPLACEMENT for TestOptimization.runHeightSweepExport()   [v3 - CLEAN SWEEP]
+// REPLACEMENT for TestOptimization.runHeightSweepExport()   [TEST 8 - CLEAN SWEEP, Fig. 4]
 //
 // WHY v2 WAS INCONCLUSIVE
 // -----------------------
@@ -528,9 +631,87 @@ public class TestOptimization {
 //                                            recommended ratio is defensible
 //                                            even if the peak drifts
 // ============================================================================
+    /**
+     * Chart data for Fig. 4 (Hr/Wf scaling): (a) log-log optimal Hr vs Wf,
+     * (b) Hr/Wf ratio at the optimum vs Wf, both per site.
+     */
+    public static ChartPanel.Spec[] getFig4ChartData() {
+        final double DT_HOURS = 0.25, ALT_FLOOR = 5.0;
+        final double W_CM = 10.0, P_CM = 15.0;
+        int[] cfgN = {4, 6, 10, 16, 24, 40};
+
+        String[] siteNames = {"Jeddah", "Diyarbakir", "Berlin"};
+        double[] siteLat = {LAT_JEDDAH, LAT_DIYARBAKIR, LAT_BERLIN};
+        double[] siteLon = {LON_JEDDAH, LON_DIYARBAKIR, LON_BERLIN};
+        Color[] colors = {new Color(214, 39, 40), new Color(31, 119, 180), new Color(44, 160, 44)};
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+
+        final double R_LO = 0.05, R_HI = 3.00;
+        final int NSTEPS = 40;   // coarser than console version, for interactive speed
+
+        List<ChartPanel.Series> seriesA = new ArrayList<>();
+        List<ChartPanel.Series> seriesB = new ArrayList<>();
+
+        for (int s = 0; s < siteNames.length; s++) {
+            SolarCalculator calc = new SolarCalculator(siteLat[s], siteLon[s], 0);
+            List<LocalDateTime> times = new ArrayList<>();
+            for (int[] dt : dates) {
+                for (int h = 3; h <= 21; h++) {
+                    for (int mm = 0; mm < 60; mm += 15) {
+                        LocalDateTime t = LocalDateTime.of(2024, dt[0], dt[1], h, mm);
+                        if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) times.add(t);
+                    }
+                }
+            }
+            if (times.isEmpty()) continue;
+            FresnelDesignProblem prob = new FresnelDesignProblem(siteLat[s], siteLon[s], times);
+
+            double[] wfs = new double[cfgN.length];
+            double[] hrs = new double[cfgN.length];
+            double[] ratios = new double[cfgN.length];
+
+            for (int ni = 0; ni < cfgN.length; ni++) {
+                int N = cfgN[ni];
+                double Wf_m = ((N - 1) * P_CM + W_CM) / 100.0;
+                double bestE = -1.0; int bestHr = 0;
+
+                for (int k = 0; k <= NSTEPS; k++) {
+                    double ratio = R_LO + (R_HI - R_LO) * k / (double) NSTEPS;
+                    double hrCm = ratio * Wf_m * 100.0;
+                    if (hrCm < 20.0) continue;
+                    DesignParameters params = new DesignParameters(hrCm, W_CM, P_CM, N);
+                    double e = 0.0;
+                    for (LocalDateTime t : times) {
+                        e += prob.evaluateOpticalMetrics(params, t).get("Q_opt") * DT_HOURS;
+                    }
+                    if (e > bestE) { bestE = e; bestHr = (int) Math.round(hrCm); }
+                }
+                wfs[ni] = Wf_m;
+                hrs[ni] = bestHr / 100.0;         // metres
+                ratios[ni] = hrs[ni] / Wf_m;
+            }
+            seriesA.add(new ChartPanel.Series(siteNames[s], colors[s], wfs, hrs, ChartPanel.Style.LINE_MARKER));
+            seriesB.add(new ChartPanel.Series(siteNames[s], colors[s], wfs, ratios, ChartPanel.Style.LINE_MARKER));
+        }
+
+        ChartPanel.Spec a = new ChartPanel.Spec();
+        a.title = "(a) optimal Hr vs field width Wf";
+        a.xLabel = "Wf (m, log)"; a.yLabel = "Hr_opt (m)";
+        a.logX = true;
+        a.series = seriesA;
+
+        ChartPanel.Spec b = new ChartPanel.Spec();
+        b.title = "(b) Hr/Wf ratio at the optimum";
+        b.xLabel = "Wf (m, log)"; b.yLabel = "Hr / Wf";
+        b.logX = true;
+        b.series = seriesB;
+
+        return new ChartPanel.Spec[]{a, b};
+    }
+
     public static void runHeightSweepExport() {
 
-        System.out.println("=== TEST 6 v3: Hr/Wf scaling | w and p/w held fixed ===\n");
+        System.out.println("=== TEST 8: Hr/Wf scaling (Fig. 4) | w and p/w held fixed ===\n");
 
         final double DT_HOURS = 0.25;
         final double ALT_FLOOR = 5.0;
@@ -645,7 +826,9 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 7 -- Daily efficiency profile export (Fig. 8)
+    // [WITHDRAWN -- not wired to any button or test ID] Daily efficiency
+    // profile export. Not referenced anywhere in the manuscript (paper_v5
+    // has five figures, none matching "Fig. 8"); kept for reference only.
     // ================================================================
     public static void runDailyEfficiencyProfile() {
         System.out.println("=== TEST 7: Daily Efficiency Profile (Fig. 8) ===\n");
@@ -710,7 +893,9 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 8 -- Convergence data export (Fig. 9)
+    // [WITHDRAWN -- not wired to any button or test ID] Convergence data
+    // export. Not referenced anywhere in the manuscript; kept for
+    // reference only.
     // ================================================================
     public static void runConvergenceExport() {
         System.out.println("=== TEST 8: Convergence Export (Fig. 9) ===");
@@ -775,7 +960,9 @@ public class TestOptimization {
     // ================================================================
     // ================================================================
     // ================================================================
-    // TEST 9 -- SolTrace cross-validation (Table 6 + Table 7)
+    // [WITHDRAWN -- not wired to any button or test ID] Superseded by
+    // Test 6 (runTable6). Used a circular ranking metric; kept for
+    // reference only.
     //
     // Generates JFS daily-average eta_opt for 28 configurations spanning
     // three parametric sweeps:
@@ -950,7 +1137,7 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 10 -- Table 6 generator
+    // TEST 3 -- Table 3-4 generator (G1-G5 vs SolTrace)
     //
     // Produces the JFS side of Table 6:
     //   "System-level optical efficiency validation: analytical model
@@ -965,7 +1152,7 @@ public class TestOptimization {
     // representative time point. Daily-average Spearman is in Test 9.
     // ================================================================
     public static void runTable6() {
-        System.out.println("=== TEST 10: Table 6 Generator (G1-G5 vs SolTrace) ===");
+        System.out.println("=== TEST 3: G1-G5 vs SolTrace (Table 3-4) ===");
         System.out.printf("Site: %.2f degN %.2f degE | Solar noon June 21%n",
                 LAT_DIYARBAKIR, LON_DIYARBAKIR);
         System.out.println("Dr=10 cm, L=1000 cm, w=10 cm (fixed)");
@@ -1087,25 +1274,27 @@ public class TestOptimization {
     }
 
     // ================================================================
-    // TEST 0 -- Run all tests
+    // TEST 0 -- Run all manuscript-referenced tests
     // ================================================================
     public static void runAllTests() {
         String sep = "\n" + "=".repeat(60) + "\n";
-        runExtremeAngleAnalysis();
+        runSolarPositionVerification();
+        System.out.print(sep);
+        runTrackingVerification();
+        System.out.print(sep);
+        runTable6();
         System.out.print(sep);
         runMirrorCountScaling();
+        System.out.print(sep);
+        runSpacingSweepExport();
         System.out.print(sep);
         runOptimizationComparison();
         System.out.print(sep);
         runTemporalSensitivity();
         System.out.print(sep);
-        runSpacingSweepExport();
-        System.out.print(sep);
         runHeightSweepExport();
         System.out.print(sep);
-        runDailyEfficiencyProfile();
-        System.out.print(sep);
-        runConvergenceExport();
+        runWellPosednessSweep();
         System.out.println("\n=== ALL TESTS COMPLETED ===");
     }
 
@@ -1169,6 +1358,11 @@ public class TestOptimization {
     }
 
     /**
+     * [WITHDRAWN -- not wired to any button or test ID] Exploratory
+     * spectrum-generation tool for a follow-up study, superseded here by
+     * Test 2 (runOptimizationComparison) for reproducing Table 10. Not
+     * referenced in the manuscript; kept for reference only.
+     *
      * LFR GLOBAL OPTIMIZATION BENCHMARK & RANKING VALIDATION
      *
      * PHASE 1: Metaheuristic Algorithm Comparison (GA, PSO, SA) PHASE 2:
@@ -1373,9 +1567,9 @@ public class TestOptimization {
     }
 
     // ============================================================================
-// NEW TEST 11 - SOLAR POSITION VERIFICATION vs NREL SPA
-// Add this method to TestOptimization.java and wire it into runSelectedTest:
-//     case 11 -> runSolarPositionVerification();
+// TEST 1 - SOLAR POSITION VERIFICATION vs NREL SPA (Table 1)
+// Wired into runSelectedTest as:
+//     case 1 -> runSolarPositionVerification();
 //
 // WHY THIS EXISTS
 // ---------------
@@ -1407,9 +1601,59 @@ public class TestOptimization {
 //
 // COLUMNS: site, month, day, local hour, SPA apparent elevation, SPA azimuth
 // ============================================================================
+    /**
+     * Chart data for Fig. 2 (solar position vs NREL SPA): (a) altitude,
+     * (b) azimuth, both vs local time, for the four representative days at
+     * Diyarbakir. The model curve (verified against NREL SPA to within
+     * 0.117 degrees RMSE, see Table 1 / Test 1 console output) is plotted;
+     * the reference is not distinguishable from it at this scale.
+     */
+    public static ChartPanel.Spec[] getFig2ChartData() {
+        SolarCalculator calc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+        String[] dateNames = {"Mar 21", "Jun 21", "Sep 21", "Dec 21"};
+        Color[] colors = {new Color(44, 160, 44), new Color(214, 39, 40),
+            new Color(255, 140, 0), new Color(31, 119, 180)};
+
+        List<ChartPanel.Series> altSeries = new ArrayList<>();
+        List<ChartPanel.Series> aziSeries = new ArrayList<>();
+
+        for (int d = 0; d < dates.length; d++) {
+            List<Double> hrs = new ArrayList<>(), alt = new ArrayList<>(), azi = new ArrayList<>();
+            for (int h = 4; h <= 20; h++) {
+                for (int mm = 0; mm < 60; mm += 10) {
+                    LocalDateTime t = LocalDateTime.of(2024, dates[d][0], dates[d][1], h, mm);
+                    SolarPosition pos = calc.calculateSolarPosition(t);
+                    if (pos.getAltitudeAngle() > 0.0) {
+                        hrs.add(h + mm / 60.0);
+                        alt.add(pos.getAltitudeAngle());
+                        azi.add(pos.getAzimuthAngle());
+                    }
+                }
+            }
+            double[] xh = hrs.stream().mapToDouble(Double::doubleValue).toArray();
+            double[] ya = alt.stream().mapToDouble(Double::doubleValue).toArray();
+            double[] yz = azi.stream().mapToDouble(Double::doubleValue).toArray();
+            altSeries.add(new ChartPanel.Series(dateNames[d], colors[d], xh, ya, ChartPanel.Style.LINE));
+            aziSeries.add(new ChartPanel.Series(dateNames[d], colors[d], xh, yz, ChartPanel.Style.LINE));
+        }
+
+        ChartPanel.Spec a = new ChartPanel.Spec();
+        a.title = "(a) Solar altitude, Diyarbakir";
+        a.xLabel = "local time (h)"; a.yLabel = "altitude (deg)";
+        a.series = altSeries;
+
+        ChartPanel.Spec b = new ChartPanel.Spec();
+        b.title = "(b) Solar azimuth, Diyarbakir";
+        b.xLabel = "local time (h)"; b.yLabel = "azimuth (deg)";
+        b.series = aziSeries;
+
+        return new ChartPanel.Spec[]{a, b};
+    }
+
     public static void runSolarPositionVerification() {
 
-        System.out.println("=== TEST 11: Solar Position vs NREL SPA (pvlib 0.15.2) ===\n");
+        System.out.println("=== TEST 1: Solar Position vs NREL SPA (Table 1) ===\n");
 
         // site, lat, lon
         Object[][] sites = {
@@ -1659,11 +1903,11 @@ public class TestOptimization {
     }
 
     // ============================================================================
-// NEW TEST 12 - MIRROR TRACKING VERIFICATION AGAINST THE LAW OF REFLECTION
+// TEST 2 - MIRROR TRACKING VERIFICATION AGAINST THE LAW OF REFLECTION (Table 2)
 //
-// Add to TestOptimization.java and wire in:
-//     case 12 -> runTrackingVerification();
-// GUI:  { "Test 12 · Tracking Solver",  "Reflection-law residual", 12 },
+// Wired in as:
+//     case 2 -> runTrackingVerification();
+// GUI:  { "Test 2 · Tracking Solver",  "Table 2 · reflection-law residual", 2 },
 //
 // WHY THIS REPLACES THE BARBON COMPARISON
 // ---------------------------------------
@@ -1705,7 +1949,7 @@ public class TestOptimization {
 // ============================================================================
     public static void runTrackingVerification() {
 
-        System.out.println("=== TEST 12: Tracking Solver vs Law of Reflection ===\n");
+        System.out.println("=== TEST 2: Tracking Solver vs Law of Reflection (Table 2) ===\n");
 
         final double ALT_FLOOR = 5.0;
 
@@ -1865,11 +2109,11 @@ public class TestOptimization {
     }
 
     // ============================================================================
-// NEW TEST 13 - WELL-POSEDNESS OF THE OPTICAL OBJECTIVE
+// TEST 9 - WELL-POSEDNESS OF THE OPTICAL OBJECTIVE (Fig. 5)
 //
-// Add to TestOptimization.java and wire in:
-//     case 13 -> runWellPosednessSweep();
-// GUI:  { "Test 13 · Well-posedness",  "Fig. 5  ·  J(N), two modes",  13 },
+// Wired in as:
+//     case 9 -> runWellPosednessSweep();
+// GUI:  { "Test 9 · Well-posedness",  "Fig. 5  ·  J(N), two modes",  9 },
 //
 // PURPOSE
 // -------
@@ -1907,7 +2151,7 @@ public class TestOptimization {
 // ============================================================================
     public static void runWellPosednessSweep() {
 
-        System.out.println("=== TEST 13: Well-posedness of the optical objective ===\n");
+        System.out.println("=== TEST 9: Well-posedness of the optical objective (Fig. 5) ===\n");
 
         final double DT_HOURS = 0.25;
         final double ALT_FLOOR = 5.0;
@@ -2050,5 +2294,102 @@ public class TestOptimization {
         System.out.println("  at its thermal minimum, produces a genuine interior optimum.");
         System.out.println("  If mode B also lands on a bound, the argument of Section 4.4");
         System.out.println("  needs revising and should be reported as such.");
+    }
+
+    /**
+     * Chart data for Fig. 5 (well-posedness): (a) unconstrained J/Jmax vs N,
+     * (b) Cg=20-constrained J/Jmax vs N with the optimum marked. Same sweep
+     * as runWellPosednessSweep() but collects series instead of printing.
+     */
+    public static ChartPanel.Spec[] getFig5ChartData() {
+
+        final double DT_HOURS = 0.25, ALT_FLOOR = 5.0, CG_MIN = 20.0;
+        final double DR_CM = FIX_DR_CM, L_CM = FIX_L_CM;
+        final int N_LO = 5, N_HI = 40;
+        final double R_LO = 0.10, R_HI = 2.00;
+        final int R_N = 40;
+
+        String[] siteNames = {"Jeddah", "Diyarbakir", "Berlin"};
+        double[] siteLat = {LAT_JEDDAH, LAT_DIYARBAKIR, LAT_BERLIN};
+        double[] siteLon = {LON_JEDDAH, LON_DIYARBAKIR, LON_BERLIN};
+        Color[] colors = {new Color(214, 39, 40), new Color(31, 119, 180), new Color(44, 160, 44)};
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+
+        List<ChartPanel.Series> seriesA = new ArrayList<>();
+        List<ChartPanel.Series> seriesB = new ArrayList<>();
+        List<ChartPanel.Series> starsB = new ArrayList<>();
+
+        for (int s = 0; s < siteNames.length; s++) {
+            SolarCalculator calc = new SolarCalculator(siteLat[s], siteLon[s], 0);
+            List<LocalDateTime> times = new ArrayList<>();
+            for (int[] dt : dates) {
+                for (int h = 3; h <= 21; h++) {
+                    for (int mm = 0; mm < 60; mm += 15) {
+                        LocalDateTime t = LocalDateTime.of(2024, dt[0], dt[1], h, mm);
+                        if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) {
+                            times.add(t);
+                        }
+                    }
+                }
+            }
+            if (times.isEmpty()) continue;
+            FresnelDesignProblem prob = new FresnelDesignProblem(siteLat[s], siteLon[s], times);
+
+            for (int mode = 0; mode < 2; mode++) {
+                double[] xs = new double[N_HI - N_LO + 1];
+                double[] js = new double[N_HI - N_LO + 1];
+                double jMax = -1.0; int bestIdx = 0;
+
+                for (int N = N_LO; N <= N_HI; N++) {
+                    double w_cm, p_cm;
+                    if (mode == 0) { w_cm = 10.0; p_cm = 15.0; }
+                    else { w_cm = CG_MIN * DR_CM / N; p_cm = 1.5 * w_cm; }
+
+                    double Wf_m = ((N - 1) * p_cm + w_cm) / 100.0;
+                    double ground = Wf_m * (L_CM / 100.0);
+
+                    double bestE = -1.0;
+                    for (int k = 0; k <= R_N; k++) {
+                        double ratio = R_LO + (R_HI - R_LO) * k / (double) R_N;
+                        double hrCm = ratio * Wf_m * 100.0;
+                        if (hrCm < 40.0) continue;
+                        DesignParameters params = new DesignParameters(hrCm, w_cm, p_cm, N);
+                        double energyWh = 0.0;
+                        for (LocalDateTime t : times) {
+                            energyWh += prob.evaluateOpticalMetrics(params, t).get("Q_opt") * DT_HOURS;
+                        }
+                        if (energyWh > bestE) bestE = energyWh;
+                    }
+                    if (bestE < 0) continue;
+                    int idx = N - N_LO;
+                    xs[idx] = N;
+                    js[idx] = bestE / ground;
+                    if (js[idx] > jMax) { jMax = js[idx]; bestIdx = idx; }
+                }
+                double[] jNorm = new double[js.length];
+                for (int i = 0; i < js.length; i++) jNorm[i] = js[i] / jMax;
+
+                if (mode == 0) {
+                    seriesA.add(new ChartPanel.Series(siteNames[s], colors[s], xs, jNorm, ChartPanel.Style.LINE_MARKER));
+                } else {
+                    seriesB.add(new ChartPanel.Series(siteNames[s], colors[s], xs, jNorm, ChartPanel.Style.LINE_MARKER));
+                    starsB.add(new ChartPanel.Series(siteNames[s] + " opt", colors[s],
+                            new double[]{xs[bestIdx]}, new double[]{jNorm[bestIdx]}, ChartPanel.Style.STAR));
+                }
+            }
+        }
+        seriesB.addAll(starsB);
+
+        ChartPanel.Spec a = new ChartPanel.Spec();
+        a.title = "(a) unconstrained: w=10 cm fixed";
+        a.xLabel = "mirror count N"; a.yLabel = "J / Jmax";
+        a.series = seriesA;
+
+        ChartPanel.Spec b = new ChartPanel.Spec();
+        b.title = "(b) constrained: Cg=20, w=200/N cm";
+        b.xLabel = "mirror count N"; b.yLabel = "J / Jmax";
+        b.series = seriesB;
+
+        return new ChartPanel.Spec[]{a, b};
     }
 }

@@ -48,6 +48,7 @@ public class DesignFresnelSystemFrame extends JFrame {
     private JProgressBar progressBar;
     private JPanel csvLinkPanel;             // clickable CSV file links
     private JScrollPane presetScrollPane;          // right panel reference
+    private JPanel chartContainer;                 // holds the manuscript figure, when applicable
     private final java.util.List<JComponent> presetFields = new java.util.ArrayList<>();
 
     // ================================================================
@@ -124,36 +125,59 @@ public class DesignFresnelSystemFrame extends JFrame {
     /**
      * Builds the left panel containing test buttons and log output.
      *
-     * Button → manuscript reference mapping: Test 1 Extreme-Angle Error → Table
-     * 8, Fig. 4 Test 2 Mirror Count Scaling → Table 12 Test 3 Metaheuristic
-     * Opt. → Table 14–15, Fig. 9 Test 4 Temporal Discret. → Table 15
-     * (sensitivity) Test 5 Spacing Sweep → Table 11, Fig. 6 Test 6 Height Sweep
-     * → Fig. 7 Test 7 Daily Profile → Fig. 8 Test 8 Convergence Export → Fig. 9
-     * (CSV data) Test 0 Run All Tests → Tests 1–8
+     * Button → manuscript reference mapping (verified against paper_v5,
+     * see repository validation log). Tables first in ascending order,
+     * then figures in ascending order:
+     *   Test 1  Solar Position        → Table 1, Fig. 2
+     *   Test 2  Tracking Solver       → Table 2
+     *   Test 3  G1-G5 vs SolTrace     → Table 3-4
+     *   Test 4  Mirror Count Scaling  → Table 6
+     *   Test 5  p/w Sweep             → Table 7, Fig. 3
+     *   Test 6  Metaheuristic Opt.    → Table 10 (Cg >= 20 hard constraint)
+     *   Test 7  Temporal Discret.     → Table 11
+     *   Test 8  Hr/Wf Scaling         → Table 8, Fig. 4
+     *   Test 9  Well-posedness        → Fig. 5
+     *   Test 0  Run All Tests         → runs all nine tests above, in order
+     *
+     * The manuscript has five figures total. Fig. 1 (field geometry and
+     * nomenclature) is a static schematic, not a computed result, and has
+     * no corresponding button.
+     *
+     * Table 5 and Table 9 have no dedicated button because neither is an
+     * independent computation: Table 5 ("Three-layer verification
+     * hierarchy") is a summary assembled from the results of Tests 1-3;
+     * Table 9 ("Metaheuristic hyperparameters") documents the fixed PSO/
+     * GA/SA settings already visible in buildGA()/buildPSO()/buildSA()
+     * below, not a result to be reproduced.
+     *
+     * Four earlier tests were withdrawn: they did not correspond to any
+     * table or figure in the manuscript (exploratory extreme-angle
+     * analysis; exploratory daily-profile / convergence exports from an
+     * earlier draft; a superseded ranking test with a circular metric).
+     * Their underlying methods remain in TestOptimization for reference
+     * but are no longer wired to a button or a test-ID case, to avoid
+     * reviewer confusion when cross-checking this tool against the
+     * manuscript.
      */
     private JPanel buildValidationPanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 8));
         panel.setBackground(BG_PANEL);
         panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // 2-column grid — 9 test buttons (Test 9 fills left cell of last row)
+        // 2-column grid — 9 test buttons (last row has one button, left cell)
         JPanel grid = new JPanel(new GridLayout(0, 2, 10, 10));
         grid.setOpaque(false);
 
         Object[][] defs = {
-            {"Test 1 · Extreme-Angle Error", "θ_T fix — rerun needed", 1},
-            {"Test 2 · Mirror Count Scaling", "Marginal gain (was Rule 2)", 2},
-            {"Test 3 · Metaheuristic Opt.", "Algorithm benchmark · Cg≥20", 3},
-            {"Test 4 · Temporal Discret.", "Resolution sensitivity", 4},
-            {"Test 5 · p/w Sweep", "3 sites × 4 seasons", 5},
-            {"Test 6 · Hr/Wf Scaling", "Dimensionless height", 6},
-            {"Test 7 · Daily Profile", "Fig. 8", 7},
-            {"Test 8 · Convergence Export", "Fig. 9  (CSV data)", 8},
-            {"Test 9 · SolTrace Ranking", "WITHDRAWN — circular metric", 9},
-            {"Test 10 · G1–G5 vs SolTrace", "MCRT validation  ρ=1.000", 10},
-            {"Test 11 · Solar Position", "vs NREL SPA (pvlib)", 11},
-            {"Test 12 · Tracking Solver", "Reflection-law residual", 12},
-            { "Test 13 · Well-posedness", "Fig. 5 · J(N), two modes", 13 },
+            {"Test 1 · Solar Position", "Table 1, Fig. 2 · vs NREL SPA (pvlib)", 1},
+            {"Test 2 · Tracking Solver", "Table 2 · reflection-law residual", 2},
+            {"Test 3 · G1–G5 vs SolTrace", "Table 3-4 · MCRT validation", 3},
+            {"Test 4 · Mirror Count Scaling", "Table 6", 4},
+            {"Test 5 · p/w Sweep", "Table 7, Fig. 3 · 3 sites x 4 seasons", 5},
+            {"Test 6 · Metaheuristic Opt.", "Table 10 · Cg≥20", 6},
+            {"Test 7 · Temporal Discret.", "Table 11 · resolution sensitivity", 7},
+            {"Test 8 · Hr/Wf Scaling", "Table 8, Fig. 4 · dimensionless height", 8},
+            {"Test 9 · Well-posedness", "Fig. 5 · J(N), two modes", 9},
         };
 
         for (Object[] d : defs) {
@@ -165,7 +189,7 @@ public class DesignFresnelSystemFrame extends JFrame {
         runAll.setOpaque(false);
         runAll.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
         runAll.add(makeBtn("Run All Tests",
-                "Tests 1–8  ·  complete validation suite", 0, true));
+                "Tests 1–9  ·  complete validation suite", 0, true));
 
         JPanel top = new JPanel(new BorderLayout(0, 6));
         top.setOpaque(false);
@@ -203,8 +227,17 @@ public class DesignFresnelSystemFrame extends JFrame {
         csvLinkPanel.setPreferredSize(new Dimension(0, 32));
         csvLinkPanel.setVisible(false);
 
-        JPanel bottom = new JPanel(new BorderLayout(0, 4));
+        JPanel bottom = new JPanel(new BorderLayout(0, 6));
         bottom.setOpaque(false);
+
+        // Chart area — shown only for tests that produce a manuscript figure
+        chartContainer = new JPanel(new BorderLayout());
+        chartContainer.setOpaque(false);
+        chartContainer.setPreferredSize(new Dimension(0, 260));
+        chartContainer.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        chartContainer.setVisible(false);
+        bottom.add(chartContainer, BorderLayout.NORTH);
+
         bottom.add(scroll, BorderLayout.CENTER);
 
         // Stack csvLinkPanel + progressBar at the bottom
@@ -495,6 +528,7 @@ public class DesignFresnelSystemFrame extends JFrame {
 
             // Buffer to handle \r (carriage return) — convert to \n for JTextArea
             private final StringBuilder lineBuffer = new StringBuilder();
+            private ChartPanel.Spec[] chartSpecs = null;
 
             @Override
             protected Void doInBackground() {
@@ -516,6 +550,7 @@ public class DesignFresnelSystemFrame extends JFrame {
                 System.setOut(ps);
                 try {
                     TestOptimization.runSelectedTest(testId);
+                    chartSpecs = computeChartSpecs(testId);
                 } catch (Exception ex) {
                     publish("\n[ERROR] " + ex.getMessage() + "\n");
                     ex.printStackTrace();
@@ -540,9 +575,35 @@ public class DesignFresnelSystemFrame extends JFrame {
                 progressBar.setString("Completed");
                 // Scan log for "Saved: *.csv" lines and add clickable links
                 scanAndAddCsvLinks(logArea.getText());
+
+                chartContainer.removeAll();
+                if (chartSpecs != null && chartSpecs.length == 2) {
+                    chartContainer.add(new DualChartPanel(chartSpecs[0], chartSpecs[1]),
+                            BorderLayout.CENTER);
+                    chartContainer.setVisible(true);
+                } else {
+                    chartContainer.setVisible(false);
+                }
+                chartContainer.revalidate();
+                chartContainer.repaint();
             }
         };
         worker.execute();
+    }
+
+    /**
+     * Maps a test ID to its manuscript figure, if it has one.
+     * Test 1 -> Fig. 2, Test 5 -> Fig. 3, Test 8 -> Fig. 4, Test 9 -> Fig. 5.
+     * Tests without a figure (2, 3, 4, 6, 7) and "Run All" (0) return null.
+     */
+    private ChartPanel.Spec[] computeChartSpecs(int testId) {
+        return switch (testId) {
+            case 1 -> TestOptimization.getFig2ChartData();
+            case 5 -> TestOptimization.getFig3ChartData();
+            case 8 -> TestOptimization.getFig4ChartData();
+            case 9 -> TestOptimization.getFig5ChartData();
+            default -> null;
+        };
     }
 
     // ================================================================
