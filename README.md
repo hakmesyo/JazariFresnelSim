@@ -45,35 +45,51 @@ JazariFresnelSim is an **open-source, purely-optical analytical simulation frame
 
 ---
 
-## 🚀 Quick Start (2 minutes)
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Java 17 or later** — [Download from Oracle](https://www.oracle.com/tr/java/technologies/downloads/)
 - Verify installation: open a terminal and type `java -version`
+- **Apache Ant** (bundled with NetBeans, or `apt install ant` / `brew install ant`) — used to resolve the project's dependency classpath. Verify with `ant -version`.
 
-### Option A: Download and Run (easiest — no IDE needed)
+### Option A: Download the latest release
 
-1. **Download** the latest release: [**⬇ JazariFresnelSim.zip**](https://github.com/hakmesyo/JazariFresnelSim/releases/latest/download/JazariFresnelSim.zip)
-2. **Extract** the ZIP to any folder
-3. **Double-click** `JazariFresnelSim.jar` inside the extracted folder
-4. The launcher window opens — choose **Interactive 3D Simulator** or **Design Fresnel System**
+Go to the [Releases page](https://github.com/hakmesyo/JazariFresnelSim/releases/latest) and download **Source code (zip)** (not the standalone `JazariFresnelSim.jar` asset — that one is just the compiled classes, without the `libs/` and `natives/` dependencies, and will not run on its own). Extract it, then:
 
-> **Important:** Do not move the JAR file out of its folder. The `lib/` and `natives/` folders must stay next to it.
+```bash
+cd JazariFresnelSim-<version>
+ant run
+```
+
+### Option B: Clone and build
+
+```bash
+git clone https://github.com/hakmesyo/JazariFresnelSim.git
+cd JazariFresnelSim
+ant run
+```
+
+Either way, `ant run` compiles the project and launches it with the correct classpath (all of `libs/*.jar` plus the compiled classes), resolved automatically from `nbproject/project.properties`. This is the recommended way to run the project without an IDE.
+
+> **If you only want the standalone `JazariFresnelSim.jar` release asset:** it needs `libs/*.jar` on the classpath to run — its manifest declares `Main-Class` but not `Class-Path`, so `java -jar JazariFresnelSim.jar` alone fails with `NoClassDefFoundError: com/formdev/flatlaf/FlatDarkLaf`. Download or clone the `libs/` folder alongside it and run:
+> ```bash
+> java -cp "libs/controlP5.jar:libs/core.jar:libs/gluegen-rt.jar:libs/jogl-all.jar:libs/peasy-math.jar:libs/peasycam.jar:libs/flatlaf-3.5.4.jar:JazariFresnelSim.jar" jazarifresnelsim.JazariLauncher
+> ```
+
+### Or open in an IDE
+
+Open the project folder in **NetBeans** (it is a standard NetBeans/Ant project — `nbproject/` is already configured), set `jazarifresnelsim.JazariLauncher` as the main class, and run. Any other Java IDE that can import a NetBeans/Ant project will also work.
+
+### Using the app
+
+The launcher window opens with two choices: **Interactive 3D Simulator** or **Design Fresnel System**.
 
 <p align="center">
   <img src="docs/screenshots/launcher_screenshot.png" alt="JazariFresnelSim Launcher" width="500"/>
 </p>
 
-### Option B: Run from terminal
-
-```bash
-unzip JazariFresnelSim.zip
-cd JazariFresnelSim
-java -jar JazariFresnelSim.jar
-```
-
-This opens the launcher window. Select **Design Fresnel System**, then the **Manuscript Validation** tab. Nine buttons reproduce the manuscript's tables and figures directly, in ascending order (tables first, then figures):
+Select **Design Fresnel System**, then the **Manuscript Validation** tab. Nine buttons reproduce the manuscript's tables and figures directly, in ascending order (tables first, then figures):
 
 ```
 Test 1 · Solar Position         — Table 1, Fig. 2
@@ -92,19 +108,6 @@ Tests 1, 5, 8 and 9 render the corresponding manuscript figure inline, next to t
 
 > There is no `--cli` flag in the current build; `JazariLauncher` always opens the graphical launcher.
 
-### Option C: Build from source
-
-```bash
-git clone https://github.com/hakmesyo/JazariFresnelSim.git
-cd JazariFresnelSim
-```
-
-Open the project in **NetBeans** (or any Java IDE), set `jazarifresnelsim.JazariLauncher` as the main class, and run. Alternatively, build the JAR and run:
-
-```bash
-java -jar dist/JazariFresnelSim.jar
-```
-
 ---
 
 ## ✨ Features
@@ -118,19 +121,19 @@ Implements Eqs. (1)–(16) of the manuscript. Every row below is directly reprod
 | Solar position | Spencer (1971) 7-term Fourier series | RMSE 0.117° vs. NREL SPA (Test 1) |
 | Mirror tracking | Bisector law of reflection | Residual ≈ 10⁻¹³° (Test 2) |
 | Shading/blocking | 3D vector projection, all mirror pairs | — |
-| End losses | Slant-distance lever arm (Eq. 11) | — |
-| Spillage | Closed-form Gaussian beam-intercept (Eq. 14–15), σ_opt = 2.325 mrad | — |
+| End losses | Slant-distance lever arm (Eq. 14) | — |
+| Spillage | Closed-form Gaussian beam-intercept (Eq. 15-16), σ_opt = 2.325 mrad | — |
 | System optical efficiency | Full chain vs. SolTrace MCRT, 5 geometries | RMSE 0.25 pp (Test 3) |
 
 No thermal, secondary-optics, or economic model is included — see the scope note above.
 
-**Performance:** solar position is O(1) per time step and tracking is O(N), but pairwise shading/blocking (Eq. 12) is O(N²) and dominates for the field sizes considered. One complete field evaluation takes **17.5 μs at N=17** on an Intel Core i7-10700 @ 2.90 GHz (manuscript, Sec. 3.5), which is what makes the metaheuristic searches in Test 6 practical.
+**Performance:** solar position is O(1) per time step and tracking is O(N), but pairwise shading/blocking (Eq. 13) is O(N²) and dominates for the field sizes considered. One complete field evaluation takes **17.5 μs at N=17** on an Intel Core i7-10700 @ 2.90 GHz (manuscript, Sec. 2.4), which is what makes the metaheuristic searches in Test 6 practical.
 
 **Speed vs. ray tracing:** for the five G1–G5 geometries of Table 3-4 at solar noon, the analytical engine reproduces SolTrace's optical efficiency to **RMSE 0.25 pp** (matching Table 4 exactly) while taking **142 μs total** against SolTrace's **20.1 s** for the same five geometries at 10⁶ target ray-receiver intersections each (~90.6 million rays generated, 4 CPU threads) — a measured **~141,000×** speedup for this comparison. This is why the framework is useful for design-space exploration: it replaces a statistically-converged Monte Carlo estimate with an exact closed-form evaluation of the same physics.
 
 ### Optimization
 
-Three metaheuristics (GA, PSO, SA) search a 4-parameter space (H_r, w, p, N) under a **hard** concentration-ratio constraint C_g = N·w/D_r ≥ 20 (Eq. 18), matching the manuscript exactly. Designs that violate the constraint are rejected outright, not softly penalized — this is what makes the optimum sit reproducibly on the constraint boundary, as reported in Table 10.
+Three metaheuristics (GA, PSO, SA) search a 4-parameter space (H_r, w, p, N) under a **hard** concentration-ratio constraint C_g = N·w/D_r ≥ 20 (Eq. 21), matching the manuscript exactly. Designs that violate the constraint are rejected outright, not softly penalized — this is what makes the optimum sit reproducibly on the constraint boundary, as reported in Table 10.
 
 | Parameter | Range |
 |-----------|-------|
@@ -179,20 +182,23 @@ SolarCalculator calc = new SolarCalculator(37.91, 40.24, 0);  // lat, lon, alt
 SolarPosition sunPos = calc.calculateSolarPosition(
     LocalDateTime.of(2024, 6, 21, 12, 0));
 
-// 2. Define a design (Hr, w, p, N -- Dr and L are fixed via config)
-DesignParameters params = new DesignParameters(216.3, 11.1, 15.0, 17);
+// 2. Define a design (Hr, w, p, N -- Dr and L are fixed via config).
+//    Cg = N*w/Dr must be >= 20; here N=20, w=10cm, Dr=10cm (fixed) -> Cg=20.0
+DesignParameters params = new DesignParameters(220.0, 10.0, 15.0, 20);
 
-// 3. Evaluate the constrained objective J [Wh/m2 of land], Eq. (18)
+// 3. Evaluate the constrained objective J [Wh/m2 of land], Eq. (22), subject to the Cg constraint Eq. (21).
+//    Designs with Cg < 20 are rejected and return 0.0 -- this is the hard
+//    constraint described in Eq. (21), not a bug.
 FresnelDesignProblem problem = new FresnelDesignProblem(
     "Diyarbakir", 37.91, 40.24);   // TMY constructor, real DNI data
-double J = problem.evaluateDesign(params);
+double J = problem.evaluateDesign(params);   // J = 8442.08 Wh/m2 for the above
 ```
 
 ---
 
 ## ✅ Validation
 
-Three independent layers, each checked against a reference the model itself was not fit to (Sec. 4 of the manuscript):
+Three independent layers, each checked against a reference the model itself was not fit to (Sec. 3 of the manuscript):
 
 ```
 Layer 1: Solar Position      ──→  NREL SPA (pvlib)     ──→  RMSE 0.117°       (Test 1)
@@ -375,24 +381,35 @@ outln("=== DONE ===");
 ```
 JazariFresnelSim/
 ├── src/jazarifresnelsim/
-│   ├── core/               # Simulation controller & interface
-│   ├── domain/              # Analytical engine (stateless, O(N))
+│   ├── core/                 # SimulationController, ISimulationController
+│   ├── domain/                # Analytical engine (stateless, O(N))
 │   │   ├── SolarCalculator.java
 │   │   ├── MirrorTracker.java
 │   │   ├── ShadingDetector.java
 │   │   ├── ConfigManager.java
-│   │   └── SolarData.java   # TMY-style DNI data (Jeddah, Diyarbakir, Berlin)
-│   ├── models/              # Immutable data representations
-│   ├── optimization/        # PSO, GA, SA + evaluation framework, and
-│   │   │                    #   TestOptimization.java (all 9 validation tests)
-│   │   ├── algorithms/
-│   │   ├── evaluation/
-│   │   └── problem/          # FresnelDesignProblem, DesignParameters
+│   │   ├── Constants.java
+│   │   ├── DaylightTimes.java
+│   │   └── SolarData.java     # TMY-style DNI data (Jeddah, Diyarbakir, Berlin)
+│   ├── models/                 # Immutable data representations
+│   ├── optimization/
+│   │   ├── TestOptimization.java  # all 9 manuscript validation tests
+│   │   ├── algorithms/            # GA, PSO, SA
+│   │   ├── evaluation/            # DesignEvaluator, OptimizationComparison
+│   │   └── problem/               # FresnelDesignProblem, DesignParameters
+│   ├── test/
+│   │   └── TestSantosBenchmark.java
 │   └── ui/
 │       ├── DesignFresnelSystemFrame.java  # Manuscript Validation panel
 │       ├── ChartPanel.java                # dependency-free XY chart renderer
-│       └── DualChartPanel.java            # side-by-side (a)/(b) figure layout
-├── docs/                    # Documentation and screenshots
+│       ├── DualChartPanel.java            # side-by-side (a)/(b) figure layout
+│       ├── FresnelRenderer.java           # Processing-based 3D visualizer
+│       └── IRenderer.java / IGUIUpdateCallback.java
+├── docs/                      # banner.png, screenshots/
+├── libs/                      # bundled dependencies (flatlaf, jogl, controlP5, ...)
+├── natives/                   # native libraries for the 3D renderer (per-OS)
+├── nbproject/                 # NetBeans project files (build-impl.xml, properties)
+├── build.xml                  # Ant build script (`ant run`, `ant jar`)
+├── config.properties          # runtime config (created on first run if absent)
 └── README.md
 ```
 
@@ -414,8 +431,8 @@ JazariFresnelSim/
 If you use JazariFresnelSim in your research, please cite:
 
 ```bibtex
-@article{atas2026limits,
-  author  = {Ata{\c{s}}, Musa and Demirta{\c{s}}, Yunus},
+@article{demirtas2026limits,
+  author  = {Demirta{\c{s}}, Yunus and Ata{\c{s}}, Musa},
   title   = {The Limits of Purely-Optical Field Sizing in Linear Fresnel
              Reflectors: A Ray-Tracing-Validated Analytical Study},
   journal = {Solar Energy},
@@ -440,7 +457,7 @@ Contributions are welcome! Areas where help is particularly appreciated:
 - **Gaussian optical error model** — extending the sunshape convolution beyond the collimated-plus-Gaussian-spread approximation used here
 - **Secondary optics (CPC)** — analytical acceptance-angle model for compound parabolic concentrators
 - **Non-uniform mirror spacing** — exposing per-mirror positions as optimization variables
-- **Utility-scale validation** — extending the SolTrace cross-check to commercial-scale geometries (see manuscript Sec. 6.2 for the scale-limitation discussion)
+- **Utility-scale validation** — extending the SolTrace cross-check to commercial-scale geometries (see manuscript Sec. 5.3 for the scale-limitation discussion)
 
 Please open an issue or pull request on GitHub.
 
