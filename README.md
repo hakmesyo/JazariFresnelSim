@@ -124,6 +124,8 @@ Implements Eqs. (1)–(16) of the manuscript. Every row below is directly reprod
 
 No thermal, secondary-optics, or economic model is included — see the scope note above.
 
+**Performance:** solar position is O(1) per time step and tracking is O(N), but pairwise shading/blocking (Eq. 12) is O(N²) and dominates for the field sizes considered. One complete field evaluation takes **17.5 μs at N=17** on an Intel Core i7-10700 @ 2.90 GHz (manuscript, Sec. 3.5), which is what makes the metaheuristic searches in Test 6 practical.
+
 ### Optimization
 
 Three metaheuristics (GA, PSO, SA) search a 4-parameter space (H_r, w, p, N) under a **hard** concentration-ratio constraint C_g = N·w/D_r ≥ 20 (Eq. 18), matching the manuscript exactly. Designs that violate the constraint are rejected outright, not softly penalized — this is what makes the optimum sit reproducibly on the constraint boundary, as reported in Table 10.
