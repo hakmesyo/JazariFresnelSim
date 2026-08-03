@@ -159,21 +159,31 @@ public class FresnelDesignProblem {
             return 0.0;
         }
 
-        // ---- 4. Thermal feasibility constraint --------------------------------
+        // ---- 4. Concentration-ratio constraint (Eq. 18) ------------------------
         // A purely optical objective is monotone toward the smallest possible
         // field: shrinking the field improves cosine, slant distance and end
         // losses simultaneously. The design problem is only well posed once a
         // non-optical requirement is imposed. The governing one is the minimum
         // geometric concentration ratio set by the target receiver temperature;
         // Cg = 20 corresponds to the low end of LFR direct steam generation
-        // (roughly 250-350 C). This is a constraint-handling penalty, not part
-        // of the optical physics, and must be reported as such.
+        // (roughly 250-350 C). This is a HARD constraint, C_g >= C_g,min: a
+        // design below the minimum concentration ratio is not merely
+        // sub-optimal, it does not meet the receiver's thermal requirement and
+        // must be excluded from the feasible set, not softly discounted. An
+        // earlier soft-penalty formulation (J scaled by cg/CG_MIN below the
+        // threshold) let the optimizer trade a small efficiency loss for a
+        // large reduction in ground footprint, converging to infeasible
+        // designs (Cg well below 20) that do not correspond to the constrained
+        // problem in Sec. 5.5-5.6 of the manuscript.
         final double CG_MIN = 20.0;
         double cg = (params.getNumberOfMirrors() * params.getMirrorWidth())
                 / params.getReceiverDiameter();
 
-        double J = energyWh / groundM2;                  // [Wh / m2 of land]
-        return (cg < CG_MIN) ? J * (cg / CG_MIN) : J;
+        if (cg < CG_MIN) {
+            return 0.0;   // infeasible: rejected, not discounted
+        }
+
+        return energyWh / groundM2;                      // [Wh / m2 of land]
     }
 
     /**

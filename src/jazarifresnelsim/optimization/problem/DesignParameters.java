@@ -45,14 +45,14 @@ public class DesignParameters {
     // ----------------------------------------------------------------
     // Optimization bounds (4 variables)
     // ----------------------------------------------------------------
-    public static double MIN_RECEIVER_HEIGHT = 30.0;
-    public static double MAX_RECEIVER_HEIGHT = 300.0;
+    public static double MIN_RECEIVER_HEIGHT = 50.0;
+    public static double MAX_RECEIVER_HEIGHT = 600.0;
     public static double MIN_MIRROR_WIDTH = 5.0;
-    public static double MAX_MIRROR_WIDTH = 30.0;
+    public static double MAX_MIRROR_WIDTH = 40.0;
     public static double MIN_MIRROR_SPACING = 15.0;
-    public static double MAX_MIRROR_SPACING = 80.0;
-    public static int MIN_NUMBER_OF_MIRRORS = 2;
-    public static int MAX_NUMBER_OF_MIRRORS = 10;
+    public static double MAX_MIRROR_SPACING = 150.0;
+    public static int MIN_NUMBER_OF_MIRRORS = 4;
+    public static int MAX_NUMBER_OF_MIRRORS = 50;
 
     // ----------------------------------------------------------------
     // Constructors
@@ -81,14 +81,14 @@ public class DesignParameters {
      * Updates optimization bounds from config file.
      */
     public static void updateBoundsFromConfig() {
-        MIN_RECEIVER_HEIGHT = ConfigManager.getDouble("min_rec_height", 30.0);
-        MAX_RECEIVER_HEIGHT = ConfigManager.getDouble("max_rec_height", 300.0);
+        MIN_RECEIVER_HEIGHT = ConfigManager.getDouble("min_rec_height", 50.0);
+        MAX_RECEIVER_HEIGHT = ConfigManager.getDouble("max_rec_height", 600.0);
         MIN_MIRROR_WIDTH = ConfigManager.getDouble("min_mirror_width", 5.0);
-        MAX_MIRROR_WIDTH = ConfigManager.getDouble("max_mirror_width", 30.0);
+        MAX_MIRROR_WIDTH = ConfigManager.getDouble("max_mirror_width", 40.0);
         MIN_MIRROR_SPACING = ConfigManager.getDouble("min_mirror_spacing", 15.0);
-        MAX_MIRROR_SPACING = ConfigManager.getDouble("max_mirror_spacing", 80.0);
-        MIN_NUMBER_OF_MIRRORS = ConfigManager.getInt("min_mirrors", 2);
-        MAX_NUMBER_OF_MIRRORS = ConfigManager.getInt("max_mirrors", 10);
+        MAX_MIRROR_SPACING = ConfigManager.getDouble("max_mirror_spacing", 150.0);
+        MIN_NUMBER_OF_MIRRORS = ConfigManager.getInt("min_mirrors", 4);
+        MAX_NUMBER_OF_MIRRORS = ConfigManager.getInt("max_mirrors", 50);
     }
 
     public double calculateGroundArea() {
