@@ -137,7 +137,13 @@ public class DesignFresnelSystemFrame extends JFrame {
      *   Test 7  Temporal Discret.     → Table 11
      *   Test 8  Hr/Wf Scaling         → Table 8, Fig. 4
      *   Test 9  Well-posedness        → Fig. 5
-     *   Test 0  Run All Tests         → runs all nine tests above, in order
+     *   Test 10 Sensitivity Analysis  → supplementary (rho_m, sigma_opt), not tied
+     *                                    to a manuscript table/figure -- reviewer
+     *                                    response material
+     *   Test 11 Low-Sun-Angle Val.    → supplementary (G2, six hours), reviewer
+     *                                    response material
+     *   Test 0  Run All Tests         → runs Tests 1-9, in order (Tests 10-11 are
+     *                                    separate; run them individually)
      *
      * The manuscript has five figures total. Fig. 1 (field geometry and
      * nomenclature) is a static schematic, not a computed result, and has
@@ -178,6 +184,8 @@ public class DesignFresnelSystemFrame extends JFrame {
             {"Test 7 · Temporal Discret.", "Table 11 · resolution sensitivity", 7},
             {"Test 8 · Hr/Wf Scaling", "Table 8, Fig. 4 · dimensionless height", 8},
             {"Test 9 · Well-posedness", "Fig. 5 · J(N), two modes", 9},
+            {"Test 10 · Sensitivity Analysis", "ρ_m, σ_opt — supplementary", 10},
+            {"Test 11 · Low-Sun-Angle Val.", "G2, 6 hours — supplementary", 11},
         };
 
         for (Object[] d : defs) {

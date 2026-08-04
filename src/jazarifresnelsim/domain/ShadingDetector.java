@@ -14,24 +14,45 @@ import java.util.List;
  * where l_loss,ij = max(l_sh,ij, l_bl,ij) prevents double-counting of shading
  * and blocking from the same neighbour.
  *
- * VERSION 4.3 — Shading/blocking overlap formula corrected.
+ * VERSION 4.4 — Directional relevance re-connected.
  *
- * BUG FIXED: Previous version computed overlap as: l_sh = max(0, projectedWidth
- * - dx) where dx = |x_i - x_j| is the centre-to-centre distance. This was
- * wrong: the shadow must first cross the GAP between mirrors before it reaches
- * mirror i. The correct formula is: gap = |x_i - x_j| - w (clear space between
- * mirror edges) l_sh = max(0, projectedWidth - gap) = max(0, projectedWidth -
- * (dx - w))
+ * BUG FOUND (via Test 11, low-sun-angle validation against SolTrace, G2
+ * geometry, Diyarbakir June 21): at low solar altitude the formula summed
+ * a shading/blocking contribution from EVERY other mirror in the field,
+ * including mirrors on the side that cannot physically cast a shadow or
+ * block the reflected beam given the sun's actual azimuth. The
+ * isShadowRelevant()/isBlockingRelevant() directional-gate helpers already
+ * existed in this class but were not called by the active formula -- dead
+ * code, most likely left over from an earlier version. At altitude=10.4 deg
+ * (06:00) this produced eta_opt=2.6% versus SolTrace's 30.4% for the same
+ * geometry and sun position (RMSE 11.96 pp over six hours spanning 10-75
+ * deg altitude, versus 0.25 pp at solar noon across five geometries --
+ * Table 3-4). At high sun altitude the mirrors on the "wrong" side already
+ * contributed close to zero loss anyway, so this fix is not expected to
+ * change the already-validated solar-noon numbers (Tables 3-4, 6, 10, 11
+ * and Fig. 3-5) -- re-run those after applying this fix to confirm.
  *
- * Physical meaning: projected shadow width must EXCEED the gap (not the
- * centre-to-centre distance) to cause any shading on mirror i.
- *
- * The same correction applies to blocking (reflected direction).
+ * OPEN QUESTION, TESTED AND RESOLVED: a max-based union of overlapping
+ * neighbour contributions (in place of the sum above) was tried and gave
+ * IDENTICAL results for the G2/six-hour test case -- for this geometry,
+ * at most one neighbour per side ever contributes a nonzero term, so sum
+ * and union coincide. The remaining low-sun-angle gap (RMSE ~5.8 pp across
+ * 10-75 deg altitude, versus 0.25 pp at solar noon) is not explained by
+ * sum-vs-union double counting. Manual inspection at 17:00 (alt=29.6 deg)
+ * confirms the formula correctly finds no geometric shadow overlap between
+ * any mirror pair at that hour (hs+hi < d for every candidate neighbour);
+ * the discrepancy against SolTrace there is not a coding bug in this
+ * formula, but most likely reflects the inherent limitation of a 1-D,
+ * projected-half-width shading approximation relative to full 3-D ray
+ * tracing at extreme oblique angles. Left as a documented limitation
+ * rather than patched further; revisiting it would mean replacing this
+ * projected-half-width model with an exact shadow-polygon intersection,
+ * a larger undertaking than this fix.
  *
  * Reference: Abbas et al. (2013), Sharma et al. (2015), Grena (2024).
  *
  * @author Yunus Demirtas, Musa Atas — Siirt University
- * @version 4.3
+ * @version 4.4
  */
 public class ShadingDetector {
 
@@ -102,13 +123,21 @@ public class ShadingDetector {
             double tj = Math.toRadians(other.getRotationAngle());
             double d = Math.abs(xi - xj);
 
-            // ayna j'nin golgesi (gunes yonunde izdusum)
-            double hs = 0.5 * w_m * Math.abs(Math.cos(tj) + Math.sin(tj) * tanSun);
-            double l_sh = Math.max(0.0, hs + hi - d);
+            // ayna j'nin golgesi (gunes yonunde izdusum) -- sadece gunese
+            // gore "yukari akim" tarafindaki komsular golge dusurebilir
+            double l_sh = 0.0;
+            if (isShadowRelevant(xi, xj, s_x)) {
+                double hs = 0.5 * w_m * Math.abs(Math.cos(tj) + Math.sin(tj) * tanSun);
+                l_sh = Math.max(0.0, hs + hi - d);
+            }
 
-            // ayna j'nin siluети (yansiyan huzme yonunde izdusum)
-            double hb = 0.5 * w_m * Math.abs(Math.cos(tj) - Math.sin(tj) * tanRef);
-            double l_bl = Math.max(0.0, hb + hi - d);
+            // ayna j'nin siluети (yansiyan huzme yonunde izdusum) -- sadece
+            // yansima yonune gore ilgili taraftaki komsular bloklayabilir
+            double l_bl = 0.0;
+            if (isBlockingRelevant(xi, xj, r_x)) {
+                double hb = 0.5 * w_m * Math.abs(Math.cos(tj) - Math.sin(tj) * tanRef);
+                l_bl = Math.max(0.0, hb + hi - d);
+            }
 
             // ayni komsudan golge+bloklama cift sayilmasin
             totalLost += Math.min(w_m, Math.max(l_sh, l_bl));

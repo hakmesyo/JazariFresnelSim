@@ -7,6 +7,8 @@ import jazarifresnelsim.domain.SolarCalculator;
 import jazarifresnelsim.domain.ConfigManager;
 import jazarifresnelsim.domain.Constants;
 import jazarifresnelsim.models.SolarPosition;
+import jazarifresnelsim.models.MirrorPosition;
+import jazarifresnelsim.domain.ShadingDetector;
 
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -102,6 +104,10 @@ public class TestOptimization {
                 runHeightSweepExport();
             case 9 ->
                 runWellPosednessSweep();
+            case 10 ->
+                runSensitivityAnalysis();
+            case 11 ->
+                runLowSunAngleValidation();
             case 0 ->
                 runAllTests();
             default ->
@@ -2391,5 +2397,289 @@ public class TestOptimization {
         b.series = seriesB;
 
         return new ChartPanel.Spec[]{a, b};
+    }
+
+    // ================================================================
+    // SENSITIVITY ANALYSIS -- rho_m and sigma_opt (one-at-a-time)
+    //
+    // Wired as Test 10 (choice=10). Deliberately numbered 10, not folded
+    // into the 1-9 sequence, because it does not correspond to a specific
+    // manuscript table/figure the way Tests 1-9 do -- it is supplementary
+    // material prepared in response to reviewer feedback on the fixed
+    // rho_m/sigma_opt assumption. Not included in "Run All Tests" (0) for
+    // the same reason.
+    //
+    // Reviewer question addressed: how sensitive are the reported optima
+    // (p/w and Hr, G2 baseline geometry w=10cm, N=6) to the two constants
+    // that were held fixed throughout the parametric study, rho_m=0.92
+    // and sigma_opt=2.325 mrad? Each is varied one at a time around its
+    // baseline, with the other held fixed, at Diyarbakir over the four
+    // representative days (Mar/Jun/Sep/Dec 21) used elsewhere in the
+    // manuscript. Constants.MIRROR_REFLECTIVITY and Constants.SIGMA_OPT
+    // are restored to baseline in a finally block so this cannot leave
+    // the fields altered for any test run afterward in the same session.
+    // ================================================================
+    public static void runSensitivityAnalysis() {
+
+        System.out.println("=== TEST 10: Sensitivity Analysis (rho_m, sigma_opt) — supplementary, not in manuscript ===\n");
+        System.out.println("Site: Diyarbakir | days: Mar/Jun/Sep/Dec 21");
+        System.out.println("Baseline geometry: w=10 cm, p/w swept for p/w_opt (Hr=130 cm fixed);");
+        System.out.println("                   Hr/Wf swept for Hr_opt (N=6, p=15 cm fixed)\n");
+
+        final double baselineRho = 0.92;
+        final double baselineSigma = 2.325e-3;
+
+        double[] rhoValues = {0.88, 0.90, 0.92, 0.94, 0.96};
+        double[] sigmaMultipliers = {0.05, 0.10, 0.25, 0.50, 0.75, 1.00, 1.50, 2.00, 3.00, 5.00, 10.00};
+
+        try {
+            System.out.println("--- Varying rho_m (sigma_opt fixed at baseline 2.325 mrad) ---");
+            System.out.printf("%-10s %12s %14s%n", "rho_m", "p/w_opt", "Hr_opt (cm)");
+            System.out.println("-".repeat(38));
+            for (double rho : rhoValues) {
+                Constants.MIRROR_REFLECTIVITY = rho;
+                Constants.SIGMA_OPT = baselineSigma;
+                double pwOpt = findOptimalPw();
+                double hrOpt = findOptimalHr();
+                String marker = (Math.abs(rho - baselineRho) < 1e-9) ? "  <- baseline" : "";
+                System.out.printf("%-10.2f %12.2f %14.1f%s%n", rho, pwOpt, hrOpt, marker);
+            }
+
+            System.out.println();
+            System.out.println("--- Varying sigma_opt (rho_m fixed at baseline 0.92) ---");
+            System.out.println("(0.05x-10x baseline, spanning near-collimated to very diffuse)");
+            System.out.printf("%-8s %16s %12s %14s%n", "x base", "sigma_opt (mrad)", "p/w_opt", "Hr_opt (cm)");
+            System.out.println("-".repeat(52));
+            for (double mult : sigmaMultipliers) {
+                double sigma = baselineSigma * mult;
+                Constants.MIRROR_REFLECTIVITY = baselineRho;
+                Constants.SIGMA_OPT = sigma;
+                double pwOpt = findOptimalPw();
+                double hrOpt = findOptimalHr();
+                String marker = (Math.abs(mult - 1.0) < 1e-9) ? "  <- baseline" : "";
+                if (pwOpt >= 9.9) marker += "  [AT UPPER p/w BOUND]";
+                if (pwOpt <= 0.55) marker += "  [AT LOWER p/w BOUND]";
+                if (hrOpt >= 500) marker += "  [AT UPPER Hr BOUND]";
+                if (hrOpt <= 22) marker += "  [AT LOWER Hr BOUND]";
+                System.out.printf("%-8.2f %16.3f %12.2f %14.1f%s%n",
+                        mult, sigma * 1000.0, pwOpt, hrOpt, marker);
+            }
+        } finally {
+            Constants.MIRROR_REFLECTIVITY = baselineRho;
+            Constants.SIGMA_OPT = baselineSigma;
+            System.out.println("\n[Constants restored to baseline: rho_m=0.92, sigma_opt=2.325 mrad]");
+        }
+    }
+
+    /**
+     * Finds the p/w ratio maximising daily optical energy for the G2
+     * baseline geometry (w=10 cm, Hr=130 cm, N=6) at Diyarbakir, summed
+     * over the four representative days. Uses whatever Constants.
+     * MIRROR_REFLECTIVITY / SIGMA_OPT are set to at call time.
+     */
+    private static double findOptimalPw() {
+        final double w = 10.0, Hr = 130.0;
+        final int N = 6;
+        final double DT_HOURS = 0.25, ALT_FLOOR = 5.0;
+        double[] pwRatios = {0.5, 0.7, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0,
+            2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0};
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+
+        SolarCalculator calc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+        List<LocalDateTime> times = new ArrayList<>();
+        for (int[] dt : dates) {
+            for (int h = 3; h <= 21; h++) {
+                for (int mm = 0; mm < 60; mm += 15) {
+                    LocalDateTime t = LocalDateTime.of(2024, dt[0], dt[1], h, mm);
+                    if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) {
+                        times.add(t);
+                    }
+                }
+            }
+        }
+        FresnelDesignProblem prob = new FresnelDesignProblem(LAT_DIYARBAKIR, LON_DIYARBAKIR, times);
+
+        double bestE = -1.0, bestPw = 0.0;
+        for (double pw : pwRatios) {
+            double p = pw * w;
+            DesignParameters params = new DesignParameters(Hr, w, p, N);
+            double e = 0.0;
+            for (LocalDateTime t : times) {
+                e += prob.evaluateOpticalMetrics(params, t).get("Q_opt") * DT_HOURS;
+            }
+            if (e > bestE) {
+                bestE = e;
+                bestPw = pw;
+            }
+        }
+        return bestPw;
+    }
+
+    /**
+     * Finds the receiver height maximising daily optical energy for the
+     * G2 baseline geometry (w=10 cm, p=15 cm, N=6) at Diyarbakir, summed
+     * over the four representative days. Uses whatever Constants.
+     * MIRROR_REFLECTIVITY / SIGMA_OPT are set to at call time.
+     */
+    private static double findOptimalHr() {
+        final double w = 10.0, p = 15.0;
+        final int N = 6;
+        final double DT_HOURS = 0.25, ALT_FLOOR = 5.0;
+        final double Wf_m = ((N - 1) * p + w) / 100.0;
+        final double R_LO = 0.02, R_HI = 6.00;
+        final int NSTEPS = 80;
+        int[][] dates = {{3, 21}, {6, 21}, {9, 21}, {12, 21}};
+
+        SolarCalculator calc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+        List<LocalDateTime> times = new ArrayList<>();
+        for (int[] dt : dates) {
+            for (int h = 3; h <= 21; h++) {
+                for (int mm = 0; mm < 60; mm += 15) {
+                    LocalDateTime t = LocalDateTime.of(2024, dt[0], dt[1], h, mm);
+                    if (calc.calculateSolarPosition(t).getAltitudeAngle() > ALT_FLOOR) {
+                        times.add(t);
+                    }
+                }
+            }
+        }
+        FresnelDesignProblem prob = new FresnelDesignProblem(LAT_DIYARBAKIR, LON_DIYARBAKIR, times);
+
+        double bestE = -1.0;
+        int bestHr = 0;
+        for (int k = 0; k <= NSTEPS; k++) {
+            double ratio = R_LO + (R_HI - R_LO) * k / (double) NSTEPS;
+            double hrCm = ratio * Wf_m * 100.0;
+            if (hrCm < 20.0) {
+                continue;
+            }
+            DesignParameters params = new DesignParameters(hrCm, w, p, N);
+            double e = 0.0;
+            for (LocalDateTime t : times) {
+                e += prob.evaluateOpticalMetrics(params, t).get("Q_opt") * DT_HOURS;
+            }
+            if (e > bestE) {
+                bestE = e;
+                bestHr = (int) Math.round(hrCm);
+            }
+        }
+        return bestHr;
+    }
+
+    // ================================================================
+    // TEST 11 -- Low-sun-angle validation (JazariFresnelSim side)
+    //
+    // Companion to soltrace_lowsun_validation.lk. Same geometry (G2
+    // standard, Table 3), same site and day (Diyarbakir, June 21), same
+    // six hours (06:00-17:00, altitude 10.4-74.9 deg). Not wired into
+    // "Run All Tests" (0) for the same reason as Test 10: it is
+    // supplementary material addressing a specific reviewer objection
+    // (Pitfall 1's error is largest at low sun angle, but Table 3-4 only
+    // validates at solar noon), not a table/figure already in the
+    // manuscript.
+    // ================================================================
+    public static void runLowSunAngleValidation() {
+        System.out.println("=== TEST 11: Low-Sun-Angle Validation (G2, six hours) — supplementary ===");
+        System.out.printf("Site: %.2f degN %.2f degE | June 21 | N=6, w=10cm, p=15cm, Hr=130cm%n",
+                LAT_DIYARBAKIR, LON_DIYARBAKIR);
+        System.out.println();
+
+        int[] hours = {6, 8, 10, 12, 14, 17};
+        String[] hourLabels = {"06:00", "08:00", "10:00", "12:00", "14:00", "17:00"};
+
+        DesignParameters params = new DesignParameters(130.0, 10.0, 15.0, 6);
+
+        System.out.printf("%-8s %9s %9s %9s %9s %9s %9s %10s%n",
+                "Hour", "alt(deg)", "cos(%)", "shad(%)", "end(%)", "spill(%)", "eta(%)", "Q_opt(W)");
+        System.out.println("-".repeat(76));
+
+        double[] etaJFS = new double[hours.length];
+
+        for (int i = 0; i < hours.length; i++) {
+            LocalDateTime t = LocalDateTime.of(2024, Month.JUNE, 21, hours[i], 0);
+            List<LocalDateTime> times = List.of(t);
+            FresnelDesignProblem problem
+                    = new FresnelDesignProblem(LAT_DIYARBAKIR, LON_DIYARBAKIR, times);
+
+            SolarCalculator calc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+            SolarPosition pos = calc.calculateSolarPosition(t);
+
+            Map<String, Double> m = problem.evaluateOpticalMetrics(params, t);
+            etaJFS[i] = m.get("eta_opt");
+
+            System.out.printf("%-8s %9.4f %9.3f %9.3f %9.3f %9.3f %9.4f %10.2f%n",
+                    hourLabels[i], pos.getAltitudeAngle(),
+                    m.get("cosine"), m.get("shading"), m.get("endloss"), m.get("spillage"),
+                    etaJFS[i], m.get("Q_opt"));
+        }
+
+        System.out.println();
+        System.out.println("[cos/shad/end/spill are the loss-chain components feeding eta_opt (Eq. 17).");
+        System.out.println(" A component that behaves very differently at 06:00 than at the other hours");
+        System.out.println(" is the one to inspect first.]");
+        System.out.println();
+        System.out.println("--- Per-mirror breakdown at 06:00 (the extreme case) ---");
+        runPerMirrorBreakdown(6, params);
+
+        System.out.println();
+        System.out.println("[Compare eta_JFS above against eta_opt_pct from");
+        System.out.println(" soltrace_lowsun_validation.lk, same six hours.]");
+    }
+
+    /**
+     * Prints cosine/shading/end-loss/spillage for each individual mirror at
+     * the given hour, so a component that misbehaves for only some mirrors
+     * (e.g. the outermost ones, where shading/end-loss geometry is most
+     * extreme) is not hidden by the field-averaged numbers printed above.
+     */
+    private static void runPerMirrorBreakdown(int hour, DesignParameters params) {
+        LocalDateTime t = LocalDateTime.of(2024, Month.JUNE, 21, hour, 0);
+        SolarCalculator calc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+        SolarPosition pos = calc.calculateSolarPosition(t);
+
+        if (pos.getAltitudeAngle() <= 0.0) {
+            System.out.println("  Sun below horizon at this hour.");
+            return;
+        }
+
+        SimulationState state = new SimulationState();
+        state.setLatitude(LAT_DIYARBAKIR);
+        state.setLongitude(LON_DIYARBAKIR);
+        state.setReceiverHeight((float) params.getReceiverHeight());
+        state.setReflectorWidth((float) params.getMirrorWidth());
+        state.setReflectorSpacing((float) params.getMirrorSpacing());
+        state.setNumReflectors(params.getNumberOfMirrors());
+        state.setReflectorLength((float) params.getMirrorLength());
+        state.setReceiverDiameter((float) params.getReceiverDiameter());
+        state.setSupportHeight(30.0f);
+        state.setCurrentTime(t);
+        state.setCurrentSolarPosition(pos);
+
+        int N = params.getNumberOfMirrors();
+        float spacing = state.getReflectorSpacing();
+        MirrorTracker tracker = new MirrorTracker();
+        List<MirrorPosition> mirrors = new ArrayList<>();
+        for (int i = 0; i < N; i++) {
+            double offset = (i < N / 2.0) ? -(i + 0.5) : (i - N / 2.0 + 0.5);
+            double xOffset = offset * spacing;
+            double angle = tracker.calculateOptimalMirrorAngle(xOffset / 100.0, pos, state);
+            mirrors.add(new MirrorPosition(angle, xOffset, state.getSupportHeight(), i));
+        }
+
+        ShadingDetector shading = new ShadingDetector();
+        SolarCalculator sc = new SolarCalculator(LAT_DIYARBAKIR, LON_DIYARBAKIR, 0);
+
+        System.out.printf("  %-4s %10s %9s %9s %9s %9s%n",
+                "i", "x(cm)", "cos", "shad(eta)", "end(f)", "spill(f)");
+        for (int i = 0; i < N; i++) {
+            MirrorPosition mirror = mirrors.get(i);
+            double etaCos = sc.calculateCosineEfficiency(mirror, pos);
+            double etaSb = shading.calculateBlockingAndShadingLoss(mirror, mirrors, state, pos);
+            double fEnd = sc.calculateEndLossEfficiency(mirror, pos, state);
+            double fSpill = sc.calculateSpillageLoss(mirror, state);
+            System.out.printf("  %-4d %10.1f %9.4f %9.4f %9.4f %9.4f%n",
+                    i, mirror.getXOffset(), etaCos, etaSb, fEnd, fSpill);
+        }
+        System.out.println("  (shad/end/spill printed as their EFFICIENCY factor eta/f, not loss --");
+        System.out.println("   a value near 0 here means that mirror contributes almost nothing.)");
     }
 }

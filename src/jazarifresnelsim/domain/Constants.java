@@ -37,8 +37,11 @@ public final class Constants {
     /**
      * Mirror specular reflectivity rho_m — Eq. (14).
      * Typical value for commercial solar mirrors: 0.92-0.95.
+     * Not final: TestOptimization.runSensitivityAnalysis() varies this
+     * around the baseline to test how strongly p/w_opt and Hr_opt depend
+     * on it, then restores the baseline value when done.
      */
-    public static final double MIRROR_REFLECTIVITY = 0.92;
+    public static double MIRROR_REFLECTIVITY = 0.92;
 
     /**
      * Effective optical error sigma_opt [rad] — standard deviation of the
@@ -49,9 +52,10 @@ public final class Constants {
      * sigma_opt = 4.65 / 2 = 2.325 mrad. Confirmed by direct measurement
      * against SolTrace: 2.333 mrad over a 5 m path (2e4 rays). No mirror
      * slope error is included, consistent with the ray-tracing
-     * configuration used for validation (manuscript Sec. 4.4, Pitfall 3).
+     * configuration used for validation (manuscript Sec. 3.5, Pitfall 3).
+     * Not final: see MIRROR_REFLECTIVITY above.
      */
-    public static final double SIGMA_OPT = 2.325e-3;
+    public static double SIGMA_OPT = 2.325e-3;
 
     /** Solar constant [W/m^2] — Hottel clear-sky DNI model. */
     public static final double SOLAR_CONSTANT = 1361.0;
