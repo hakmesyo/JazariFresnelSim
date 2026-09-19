@@ -434,7 +434,7 @@ If you use JazariFresnelSim in your research, please cite:
 @article{demirtas2026limits,
   author  = {Demirta{\c{s}}, Yunus and Ata{\c{s}}, Musa},
   title   = {The Limits of Purely-Optical Field Sizing in Linear Fresnel
-             Reflectors: A Ray-Tracing-Validated Analytical Study},
+             Reflectors},
   journal = {Solar Energy},
   year    = {2026},
   note    = {Submitted},
@@ -465,7 +465,7 @@ Please open an issue or pull request on GitHub.
 
 ## 📧 Contact
 
-- **Musa Ataş** (Corresponding Author) — [musa.atas@siirt.edu.tr](mailto:musa.atas@siirt.edu.tr)
+- **Musa Ataş** — [musa.atas@siirt.edu.tr](mailto:musa.atas@siirt.edu.tr)
 - **Yunus Demirtaş** — [yunusdemirtas@siirt.edu.tr](mailto:yunusdemirtas@siirt.edu.tr)
 
 Department of Computer Engineering & Mechanical Engineering, Siirt University, Turkey
